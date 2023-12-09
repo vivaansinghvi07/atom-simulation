@@ -1,8 +1,5 @@
-#include "stdio.h"
 #include <SDL2/SDL.h>
-#include <stdint.h>
-#include <string.h>
-#include "include/test.c"
+#include "include/atom.c"
 
 #define SCREEN_X 400
 #define SCREEN_Y 400
@@ -13,8 +10,6 @@ typedef struct {
         uint8_t g;
         uint8_t b;
 } RGB_color;
-
-void debug_atoms(Atom *atoms);
 
 // https://github.com/MikeShah/SDL2_Tutorials/blob/main/8_ModifyingSurface/main.cpp
 void set_pixel(SDL_Surface *surface, int x, int y, RGB_color color) {
@@ -93,6 +88,5 @@ int main() {
                 display_atoms(surface, atoms);
                 SDL_UpdateWindowSurface(window);
         }
-        free(atoms);
         return 0;
 }
