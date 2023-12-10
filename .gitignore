@@ -1,3 +1,7 @@
+# Manually added SDL library
+sdl_include/*
+sdl_lib/*
+
 # Prerequisites
 *.d
 
