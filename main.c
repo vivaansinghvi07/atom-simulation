@@ -1,9 +1,10 @@
 #include <SDL2/SDL.h>
-#include "include/atom.c"
+#include "atom.c"
 
-#define SCREEN_X 400
-#define SCREEN_Y 400
+#define SCREEN_X 1600
+#define SCREEN_Y 800
 #define N_ATOMS 100
+#define ATOM_WIDTH 5
 
 typedef struct {
         uint8_t r;
@@ -17,7 +18,7 @@ void set_pixel(SDL_Surface *surface, int x, int y, RGB_color color) {
                 return;
         }
         uint8_t *pixels = (uint8_t *)surface->pixels;
-        uint pixel_address = y * surface->pitch + x * surface->format->BytesPerPixel;
+        int pixel_address = y * surface->pitch + x * surface->format->BytesPerPixel;
         pixels[pixel_address + 0] = color.r;
         pixels[pixel_address + 1] = color.g;
         pixels[pixel_address + 2] = color.b;
@@ -28,29 +29,12 @@ void clear_screen(SDL_Surface *surface) {
         memset(pixels, 0, SCREEN_X * SCREEN_Y * 4);  // stored as rgba
 }
 
-void init_atoms(Atom *atoms) {
-        for (int i = 0; i < N_ATOMS; ++i) {
-                atoms[i].mass = 1; 
-                atoms[i].position = (Point) {rand() % SCREEN_X, rand() % SCREEN_Y};
-        }
-}
-
-void debug_atoms(Atom *atoms) {
-        for (int i = 0; i < N_ATOMS; ++i) {
-                Atom atom = atoms[i];
-                printf("Mass: %d\n", atom.mass);
-                printf("Position: %.2g %.2g\n", atom.position.x, atom.position.y);
-                printf("Velocity: %.2g %.2g\n", atom.velocity.x, atom.velocity.y);
-                printf("Acceleration: %.2g %.2g\n", atom.acceleration.x, atom.acceleration.y);
-        }
-}
-
 void display_atoms(SDL_Surface *surface, Atom *atoms) {
         for (int i = 0; i < N_ATOMS; ++i) { 
                 int atom_x = atoms[i].position.x;
                 int atom_y = atoms[i].position.y;
-                for (int x = -1; x < 2; ++x) {
-                        for (int y = -1; y < 2; ++y) {
+                for (int x = -(ATOM_WIDTH / 2); x < ATOM_WIDTH / 2 + 1; ++x) {
+                        for (int y = -(ATOM_WIDTH / 2); y < ATOM_WIDTH / 2 + 1; ++y) {
                                 set_pixel(surface, atom_x + x, atom_y + y, (RGB_color){255, 255, 255});
                         }
                 }
@@ -58,32 +42,23 @@ void display_atoms(SDL_Surface *surface, Atom *atoms) {
 }
 
 int main() {
-         
-        // determine what the dimensions for the simulation will be
-        Atom *atoms = malloc(sizeof(Atom) * N_ATOMS);
-        init_atoms(atoms);
-        
-        // initialize the window and run the window control sequence
+        Atom *atoms = init_atoms(N_ATOMS, SCREEN_X, SCREEN_Y);
         SDL_Window *window = SDL_CreateWindow(
                 "Simulation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
                 SCREEN_X, SCREEN_Y, 0
         );
         SDL_Surface *surface = SDL_GetWindowSurface(window);
         SDL_Event event;
-        int quit = 0, running = 0;
+        int quit = 0;
         while (!quit) {
 
                 while (SDL_PollEvent(&event)) {
                         if (event.type == SDL_QUIT) {
                                 quit = 1;
-                        } else if (event.button.button == SDL_BUTTON_LEFT) { 
-                                running = !running;
                         }
                 }
-                if (!running) {
-                        continue;
-                }
 
+                step_simulation(atoms, N_ATOMS);
                 clear_screen(surface);
                 display_atoms(surface, atoms);
                 SDL_UpdateWindowSurface(window);
