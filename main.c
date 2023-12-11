@@ -7,6 +7,7 @@
 #define SCREEN_Y 800
 #define N_ATOMS 2000
 #define ATOM_WIDTH 5
+#define DISPLAY_COLOR COLOR_RANDOM
 
 typedef struct {
         uint8_t r;
@@ -34,7 +35,7 @@ void set_pixel(SDL_Surface *surface, int x, int y, RGB_color color) {
 
 void clear_screen(SDL_Surface *surface) {
         uint8_t *pixels = (uint8_t *)surface->pixels; 
-        memset(pixels, 0, SCREEN_X * SCREEN_Y * 4);  // stored as rgba
+        memset(pixels, 0, SCREEN_X * SCREEN_Y * 4);  // stored as gbra
 }
 
 void display_atoms(SDL_Surface *surface, Atom *atoms, enum ColorMode color_mode) {
@@ -103,7 +104,7 @@ int main() {
 
                 step_simulation(atoms, N_ATOMS);
                 clear_screen(surface);
-                display_atoms(surface, atoms, COLOR_RANDOM);
+                display_atoms(surface, atoms, DISPLAY_COLOR);
                 SDL_UpdateWindowSurface(window);
         }
         return 0;
