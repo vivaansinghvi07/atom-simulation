@@ -1,24 +1,22 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "point.c"
+
+#ifndef SIM_ATOM
+#define SIM_ATOM
 
 // fine tune these parameters to control gravitation 
 #define GRAVITATIONAL_CONSTANT 0.5
 #define GRAVITATIONAL_DISTANCE_GUARD 20000
-
-typedef struct point { 
-        double x;
-        double y;
-} Point;
 
 typedef struct atom {
         int mass;
         Point position;
         Point velocity;
         Point acceleration;
-} Atom;
+} Atom; 
 
-double abs_point(Point *p);
 Atom *init_atoms(int n_atoms, int x_max, int y_max);
 void debug_atoms(Atom *atoms, int n_atoms);
 void apply_gravity_to_center(Atom *atoms, int n_atoms);
@@ -26,17 +24,13 @@ void apply_gravity_each_point_naive(Atom *atoms, int n_atoms);
 Point get_gravity_of_a(int mass_a, Point *com_a, Point *com_b);
 void step_simulation(Atom *atoms, int n_atoms);
 
-double abs_point(Point *p) {
-        return sqrt(p->x * p->x + p->y * p->y);
-}
-
 Atom *init_atoms(int n_atoms, int x_max, int y_max) {
         srand(100);
         Atom *atoms = malloc(sizeof(Atom) * n_atoms);
         for (int i = 0; i < n_atoms; ++i) {
                         atoms[i].mass = 1; 
-                atoms[i].position = (Point) {.x = rand() % (x_max / 2) + (x_max / 4), 
-                                             .y = rand() % (y_max / 2) + (y_max / 4) };
+                atoms[i].position = (Point) {.x = rand() % (x_max / 2) + ((double) x_max / 4), 
+                                             .y = rand() % (y_max / 2) + ((double) y_max / 4) };
         }
         return atoms;
 }
@@ -120,3 +114,5 @@ Point get_gravity_of_a(int mass_a, Point *com_a, Point *com_b) {
         double acceleration_gravity = mass_a * GRAVITATIONAL_CONSTANT / (overall_distance * overall_distance + GRAVITATIONAL_DISTANCE_GUARD);
         return (Point) { .x = acceleration_gravity * cos(angle_to_a), .y = acceleration_gravity * sin(angle_to_a) };
 }
+
+#endif

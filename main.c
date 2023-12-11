@@ -1,13 +1,18 @@
 #include <SDL2/SDL.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include "point.c"
 #include "atom.c"
 
 #define SCREEN_X 800
 #define SCREEN_Y 800
-#define N_ATOMS 2000
 #define ATOM_WIDTH 5
 #define DISPLAY_COLOR COLOR_RANDOM
+#define CLICK_PLACE_WIDTH 200
+#define CLICK_PLACE_GAP 10
+
+int N_ATOMS = 400;  
 
 typedef struct {
         uint8_t r;
@@ -20,6 +25,12 @@ enum ColorMode {
         COLOR_RANDOM, 
         COLOR_VELOCITY
 };
+
+void set_pixel(SDL_Surface *surface, int x, int y, RGB_color color);
+void clear_screen(SDL_Surface *surface);
+void display_atoms(SDL_Surface *surface, Atom *atoms, enum ColorMode color_mode);
+void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_x, int mouse_y);
+int main(void);
 
 // https://github.com/MikeShah/SDL2_Tutorials/blob/main/8_ModifyingSurface/main.cpp
 void set_pixel(SDL_Surface *surface, int x, int y, RGB_color color) {
@@ -85,7 +96,47 @@ void display_atoms(SDL_Surface *surface, Atom *atoms, enum ColorMode color_mode)
         }
 }
 
-int main() {
+void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_x, int mouse_y) { 
+
+        // fill a list of points in which new atoms are going to go
+        PointNode *head = malloc(sizeof(PointNode));
+        head->data = (Point) {.x = mouse_x, .y = mouse_y};
+        int n_new_atoms = 0;
+        for (int x = -CLICK_PLACE_WIDTH; x < CLICK_PLACE_WIDTH; x += CLICK_PLACE_GAP) {
+                for (int y = -CLICK_PLACE_WIDTH; y < CLICK_PLACE_WIDTH; y += CLICK_PLACE_GAP) {
+                        Point atom_location = { .x = mouse_x + x, .y = mouse_y + y};
+                        if (sqrt(x*x + y*y) < CLICK_PLACE_WIDTH) {
+                                prepend_to_list(&head, &atom_location);
+                                n_new_atoms++;
+                        }
+                }
+        }
+
+        // https://stackoverflow.com/a/63861885
+        // extend the array to contain these new atoms
+        *atoms_pointer = (Atom *) realloc(*atoms_pointer, 
+                                          (*n_atoms_pointer + n_new_atoms) * sizeof(Atom));
+        memset(*atoms_pointer + *n_atoms_pointer, 0, n_new_atoms * sizeof(Atom));
+        printf("%d \n", n_new_atoms);
+
+        // create each new atom
+        int current_atom = *n_atoms_pointer;
+        while (head != NULL) {
+                (*atoms_pointer)[current_atom] = (Atom) {
+                        .mass = 1,
+                        .position = (Point) { .x = head->data.x, .y = head->data.y },
+                        .velocity = (Point) {0},
+                        .acceleration = (Point) {0}
+                };
+                head = head->next;
+        }
+
+        // free the linked list when done and adjust the atom count
+        free_list(head);
+        *n_atoms_pointer += n_new_atoms;
+}
+
+int main(void) {
         Atom *atoms = init_atoms(N_ATOMS, SCREEN_X, SCREEN_Y);
         SDL_Window *window = SDL_CreateWindow(
                 "Simulation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
@@ -93,12 +144,17 @@ int main() {
         );
         SDL_Surface *surface = SDL_GetWindowSurface(window);
         SDL_Event event;
-        int quit = 0;
+        int mouse_x, mouse_y;
+        bool quit = false;
         while (!quit) {
+
+                SDL_GetMouseState(&mouse_x, &mouse_y);
 
                 while (SDL_PollEvent(&event)) {
                         if (event.type == SDL_QUIT) {
                                 quit = 1;
+                        } else if (event.button.button == SDL_BUTTON_LEFT) {
+                                add_atoms_upon_click(&atoms, &N_ATOMS, mouse_x, mouse_y);
                         }
                 }
 
