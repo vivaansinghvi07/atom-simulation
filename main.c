@@ -2,17 +2,17 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include "point.c"
-#include "atom.c"
+#include "include/point.c"
+#include "include/atom.c"
 
-#define SCREEN_X 800
-#define SCREEN_Y 800
-#define ATOM_WIDTH 5
-#define DISPLAY_COLOR COLOR_RANDOM
-#define CLICK_PLACE_WIDTH 200
-#define CLICK_PLACE_GAP 10
+#define SCREEN_X 1600
+#define SCREEN_Y 900
+#define ATOM_WIDTH 3
+#define DISPLAY_COLOR COLOR_VELOCITY
+#define CLICK_PLACE_WIDTH 25
+#define CLICK_PLACE_GAP 1
 
-int N_ATOMS = 400;  
+int N_ATOMS = 0;  
 
 typedef struct {
         uint8_t r;
@@ -39,8 +39,8 @@ void set_pixel(SDL_Surface *surface, int x, int y, RGB_color color) {
         }
         uint8_t *pixels = (uint8_t *)surface->pixels;
         int pixel_address = y * surface->pitch + x * surface->format->BytesPerPixel;
-        pixels[pixel_address + 0] = color.g;
-        pixels[pixel_address + 1] = color.b;
+        pixels[pixel_address + 0] = color.b;
+        pixels[pixel_address + 1] = color.g;
         pixels[pixel_address + 2] = color.r;
 }
 
@@ -83,7 +83,7 @@ void display_atoms(SDL_Surface *surface, Atom *atoms, enum ColorMode color_mode)
                                 b = rand() % 255;
                                 break;
                         case COLOR_VELOCITY:
-                                r = g = (int) ((abs_point(&atoms[i].velocity) + min_velocity) / (max_velocity - min_velocity) * 255);
+                                g = b = (int) ((abs_point(&atoms[i].velocity) + min_velocity) / (max_velocity - min_velocity) * 155) + 100;
                                 break;
                 }
 
@@ -101,7 +101,7 @@ void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_
         // fill a list of points in which new atoms are going to go
         PointNode *head = malloc(sizeof(PointNode));
         head->data = (Point) {.x = mouse_x, .y = mouse_y};
-        int n_new_atoms = 0;
+        int n_new_atoms = 1;
         for (int x = -CLICK_PLACE_WIDTH; x < CLICK_PLACE_WIDTH; x += CLICK_PLACE_GAP) {
                 for (int y = -CLICK_PLACE_WIDTH; y < CLICK_PLACE_WIDTH; y += CLICK_PLACE_GAP) {
                         Point atom_location = { .x = mouse_x + x, .y = mouse_y + y};
@@ -114,12 +114,14 @@ void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_
 
         // https://stackoverflow.com/a/63861885
         // extend the array to contain these new atoms
-        *atoms_pointer = (Atom *) realloc(*atoms_pointer, 
-                                          (*n_atoms_pointer + n_new_atoms) * sizeof(Atom));
+        Atom *reallocated_pointer = realloc(*atoms_pointer, (*n_atoms_pointer + n_new_atoms) * sizeof(Atom));
+        if (reallocated_pointer == NULL) {
+                goto quit;
+        }
+        *atoms_pointer = reallocated_pointer;
         memset(*atoms_pointer + *n_atoms_pointer, 0, n_new_atoms * sizeof(Atom));
-        printf("%d \n", n_new_atoms);
 
-        // create each new atom
+        // create each new atom and add it to the array
         int current_atom = *n_atoms_pointer;
         while (head != NULL) {
                 (*atoms_pointer)[current_atom] = (Atom) {
@@ -129,11 +131,11 @@ void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_
                         .acceleration = (Point) {0}
                 };
                 head = head->next;
+                current_atom++;
         }
-
-        // free the linked list when done and adjust the atom count
-        free_list(head);
         *n_atoms_pointer += n_new_atoms;
+quit:
+        free_list(head);
 }
 
 int main(void) {
