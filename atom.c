@@ -7,8 +7,10 @@
 #define SIM_ATOM
 
 // fine tune these parameters to control gravitation 
-#define GRAVITATIONAL_CONSTANT 0.5
+#define COLLISION_ATOM_WIDTH 10
+#define GRAVITATIONAL_CONSTANT 0.08
 #define GRAVITATIONAL_DISTANCE_GUARD 20000
+#define GRAVITATIONAL_FUNCTION apply_gravity_to_center
 
 typedef struct atom {
         int mass;
@@ -47,13 +49,40 @@ void debug_atoms(Atom *atoms, int n_atoms) {
 
 void step_simulation(Atom *atoms, int n_atoms) {
 
-        apply_gravity_to_center(atoms, n_atoms);
+        GRAVITATIONAL_FUNCTION(atoms, n_atoms);
         for (int i = 0; i < n_atoms; ++i) {
                 Atom *atom = &atoms[i];
                 atom->position.x += atom->velocity.x;
                 atom->position.y += atom->velocity.y;
                 atom->velocity.x += atom->acceleration.x;
                 atom->velocity.y += atom->acceleration.y;
+        }
+}
+
+// use conservation of momentum on the two atoms to simulate an elastic collision
+void apply_collision(Atom *atom, Atom *other, Point *distance) {
+        double angle = atan2(distance->y * distance->y, distance->x * distance->x);
+        double velocity_com_x = (atom->velocity.x * atom->mass + other->velocity.x * other->mass) / (atom->mass + other->mass);
+        double velocity_com_y = (atom->velocity.y * atom->mass + other->velocity.y * other->mass) / (atom->mass + other->mass);
+        atom->velocity.x = 2 * velocity_com_x - atom->velocity.x;
+        other->velocity.x = 2 * velocity_com_x - other->velocity.x;
+        atom->velocity.y = 2 * velocity_com_y - atom->velocity.y;
+        other->velocity.y = 2 * velocity_com_y - other->velocity.y;
+}
+
+// adds collision detection to stop atoms from going into each other
+void apply_collision_detection_naive(Atom *atoms, int n_atoms) {
+        Point distance;
+        for (int i = 0; i < n_atoms; ++i) {
+                Atom *atom = &atoms[i];
+                for (int j = i + 1; j < n_atoms; ++j) {
+                        Atom *other = &atoms[j];
+                        distance = (Point) {.x = other->position.x - atom->position.x,
+                                            .y = other->position.y - atom->position.y };
+                        if (abs_point(&distance) < COLLISION_ATOM_WIDTH) {
+                                apply_collision(atom, other, &distance);
+                        }
+                } 
         }
 }
 
