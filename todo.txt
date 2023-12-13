@@ -2,3 +2,5 @@ make a grid, with each square in the grid representing a center of mass and a gi
 for each square in each grid of varying complexity, determine the aforementioned traits
 for points that are too close to be abstracted away, consider the exact points for calculations
 we can do this by creating some sort of list (maybe linked list) to store particles in a given location -- this might be too computationally expensive
+
+also, to implement with this alg: http://arborjs.org/docs/barnes-hut
