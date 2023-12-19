@@ -6,25 +6,73 @@
 #ifndef SIM_ATOM
 #define SIM_ATOM
 
-// fine tune these parameters to control gravitation 
-#define COLLISION_ATOM_WIDTH 10
-#define GRAVITATIONAL_CONSTANT 0.08
-#define GRAVITATIONAL_DISTANCE_GUARD 20000
-#define GRAVITATIONAL_FUNCTION apply_gravity_to_center
+// constants for repulsion force between particles
+#define REPULSION_FUNC_A 0.000002
+#define REPULSION_FUNC_B 5
 
-typedef struct atom {
+// min distance between two centers to not be considered a collision
+#define COLLISION_ATOM_WIDTH 15 
+
+// modifications for gravitational functions
+#define GRAVITATIONAL_CONSTANT 0.8
+#define GRAVITATIONAL_DISTANCE_GUARD 20000
+#define GRAVITATIONAL_FUNCTION apply_gravity_each_point_naive
+
+typedef struct {
         int mass;
         Point position;
         Point velocity;
         Point acceleration;
 } Atom; 
 
+typedef struct atom_node {
+        Atom *data;
+        struct atom_node *next;
+} AtomNode;
+
+int SIMULATION_STEPS = 0;
+
+// generates a list of atoms that have posisions (0 -> x_max / 2, 0 -> y_max / 2)
 Atom *init_atoms(int n_atoms, int x_max, int y_max);
+
+// prints information for each atom on the screen
 void debug_atoms(Atom *atoms, int n_atoms);
-void apply_gravity_to_center(Atom *atoms, int n_atoms);
-void apply_gravity_each_point_naive(Atom *atoms, int n_atoms);
-Point get_gravity_of_a(int mass_a, Point *com_a, Point *com_b);
+
+// goes to the next simulation step, modifying acceleration and velocity when applicable
 void step_simulation(Atom *atoms, int n_atoms);
+
+// adds the velocity to the position, and the acceleration to the velocity 
+void iterate_kinematics(Atom *atoms, int n_atoms);
+
+// applies gravity towards the mouse for each point 
+void apply_gravity_to_mouse(Atom *atoms, int n_atoms, int mouse_x, int mouse_y, int mouse_mass);
+
+// apply gravity of each atom towards the center of mass of every other one
+void apply_gravity_to_center(Atom *atoms, int n_atoms);  // O(n)
+
+// apply gravity on each point by considering each other point
+void apply_gravity_each_point_naive(Atom *atoms, int n_atoms);  // O(n^2)
+
+// helper funciton to determine gravity from one object to another
+Point get_gravity_of_a(int mass_a, Point *com_a, Point *com_b);
+
+// applies collision detection between each atom
+void apply_collision_detection_naive(Atom *atoms, int n_atoms); // O(n^2) 
+
+// performs a collision between the two atoms, adjusting their velocity
+void apply_collision(Atom *atom, Atom *other, Point *distance);
+
+// apply a force of \frac{B}{x^3} - \frac{A}{x^4} between each atom 
+// less cool of an effect as the repulsive force tends to make eveyrthing go away
+void apply_attraction_repulsion_function_naive(Atom *atoms, int n_atoms);  // O(n^2)
+
+// computes the above force model between two masses 
+Point get_attractive_repulsive_force_of_a(int mass_a, Point *com_a, Point *com_b);
+
+/*
+ * FUNCTION IMPLEMENTATIONS BELOW
+ * END OF PSEUDO HEADER FILE
+ */
 
 Atom *init_atoms(int n_atoms, int x_max, int y_max) {
         srand(100);
@@ -47,9 +95,7 @@ void debug_atoms(Atom *atoms, int n_atoms) {
         }
 }
 
-void step_simulation(Atom *atoms, int n_atoms) {
-
-        GRAVITATIONAL_FUNCTION(atoms, n_atoms);
+void iterate_kinematics(Atom *atoms, int n_atoms) {
         for (int i = 0; i < n_atoms; ++i) {
                 Atom *atom = &atoms[i];
                 atom->position.x += atom->velocity.x;
@@ -59,15 +105,46 @@ void step_simulation(Atom *atoms, int n_atoms) {
         }
 }
 
+void step_simulation(Atom *atoms, int n_atoms) {
+        SIMULATION_STEPS++;
+        GRAVITATIONAL_FUNCTION(atoms, n_atoms);
+        if (SIMULATION_STEPS % 7 == 0) {  // collision detection step
+                apply_collision_detection_naive(atoms, n_atoms);
+        }
+}
+
+// helper function for the below function, changes an atom's velocity for a collision
+void _apply_new_velocity(Atom *atom, Point *velocity_com, double angle_of_collision) {
+
+        // determine details about the velocity relative to center of mass
+        Point velocity_atom_com = (Point) {.x = atom->velocity.x - velocity_com->x, 
+                                           .y = atom->velocity.y - velocity_com->y};
+        double angle_of_velocity = atan2(velocity_atom_com.y, velocity_atom_com.x);
+
+        // determine the new angle at which the point bounces off of 
+        angle_of_velocity = fmod(angle_of_velocity + M_PI, M_PI * 2); 
+        angle_of_collision -= M_PI;
+        while (angle_of_velocity - angle_of_collision > M_PI_2) {
+                angle_of_collision += M_PI;
+        }
+        double new_angle_of_velocity = angle_of_velocity - 2 * (angle_of_velocity - angle_of_collision);
+
+        // adjust the atom's velocity with the new information
+        atom->velocity = (Point) {.x = abs_point(&velocity_atom_com) * cos(new_angle_of_velocity) + velocity_com->x,
+                                  .y = abs_point(&velocity_atom_com) * sin(new_angle_of_velocity) + velocity_com->y};
+}
+
 // use conservation of momentum on the two atoms to simulate an elastic collision
 void apply_collision(Atom *atom, Atom *other, Point *distance) {
-        double angle = atan2(distance->y * distance->y, distance->x * distance->x);
-        double velocity_com_x = (atom->velocity.x * atom->mass + other->velocity.x * other->mass) / (atom->mass + other->mass);
-        double velocity_com_y = (atom->velocity.y * atom->mass + other->velocity.y * other->mass) / (atom->mass + other->mass);
-        atom->velocity.x = 2 * velocity_com_x - atom->velocity.x;
-        other->velocity.x = 2 * velocity_com_x - other->velocity.x;
-        atom->velocity.y = 2 * velocity_com_y - atom->velocity.y;
-        other->velocity.y = 2 * velocity_com_y - other->velocity.y;
+
+        // determine the velocity of the center of mass and the line of collision between the two objects
+        Point velocity_com = (Point) {.x = (atom->velocity.x * atom->mass + other->velocity.x * other->mass) / (atom->mass + other->mass), 
+                                      .y = (atom->velocity.y * atom->mass + other->velocity.y * other->mass) / (atom->mass + other->mass)};
+        double angle_of_collision = fmod(atan2(distance->y, distance->x) + M_PI, M_PI);
+        
+        // change the velocities of both of the atom 
+        _apply_new_velocity(atom, &velocity_com, angle_of_collision);
+        _apply_new_velocity(other, &velocity_com, angle_of_collision);
 }
 
 // adds collision detection to stop atoms from going into each other
@@ -77,8 +154,7 @@ void apply_collision_detection_naive(Atom *atoms, int n_atoms) {
                 Atom *atom = &atoms[i];
                 for (int j = i + 1; j < n_atoms; ++j) {
                         Atom *other = &atoms[j];
-                        distance = (Point) {.x = other->position.x - atom->position.x,
-                                            .y = other->position.y - atom->position.y };
+                        distance = subtract_a_minus_b(&other->position, &atom->position);
                         if (abs_point(&distance) < COLLISION_ATOM_WIDTH) {
                                 apply_collision(atom, other, &distance);
                         }
@@ -86,10 +162,37 @@ void apply_collision_detection_naive(Atom *atoms, int n_atoms) {
         }
 }
 
+// using a model of \frac{B}{x^3} - \frac{A}{x^4} to determine force between particles
+Point get_attractive_repulsive_force_of_a(int mass_a, Point *com_a, Point *com_b) {
+        Point distance = subtract_a_minus_b(com_a, com_b);
+        double overall_distance = abs_point(&distance);
+        double force = - REPULSION_FUNC_A / pow(overall_distance, 4)  
+                       + REPULSION_FUNC_B / pow(overall_distance, 3);
+        return (Point) {.x = fast_cos_atan2(&distance) * force,
+                        .y = fast_sin_atan2(&distance) * force};
+}
+
+void apply_attraction_repulsion_function_naive(Atom *atoms, int n_atoms) {
+        for (int i = 0; i < n_atoms; ++i) {
+                Atom *atom = &atoms[i];
+                atom->acceleration = (Point) {0};
+                for (int j = 0; j < n_atoms; ++j) {
+                        if  (i == j) { 
+                                continue;
+                        }
+                        Atom *other = &atoms[j];
+                        Point force = get_attractive_repulsive_force_of_a(other->mass, &other->position, &atom->position);
+                        atom->acceleration.x += force.x / atom->mass;
+                        atom->acceleration.y += force.y / atom->mass;
+                }
+        } 
+}
+
 // calculates the gravity of each point by considering the gravity of each other point - O(n^2) always
 void apply_gravity_each_point_naive(Atom *atoms, int n_atoms) {
         for (int i = 0; i < n_atoms; ++i) {
                 Atom *atom = &atoms[i];
+                atom->acceleration = (Point) {0};
                 for (int j = 0; j < n_atoms; ++j) {
                         if (i == j) {
                                 continue;
@@ -99,6 +202,17 @@ void apply_gravity_each_point_naive(Atom *atoms, int n_atoms) {
                         atom->acceleration.x += acceleration_gravity.x;
                         atom->acceleration.y += acceleration_gravity.y;
                 }
+        }
+}
+
+// gravitate points towards given coordinates
+void apply_gravity_to_mouse(Atom *atoms, int n_atoms, int mouse_x, int mouse_y, int mouse_mass) {
+        Point mouse_coords = (Point) {.x = mouse_x, .y = mouse_y};
+        for (int i = 0; i < n_atoms; ++i) {
+                Atom *atom = &atoms[i];
+                Point acceleration_gravity = get_gravity_of_a(mouse_mass, &mouse_coords, &atom->position);
+                atom->acceleration.x += acceleration_gravity.x;
+                atom->acceleration.y += acceleration_gravity.y;
         }
 }
 
@@ -137,11 +251,11 @@ void apply_gravity_to_center(Atom *atoms, int n_atoms) {
 // where r_i is the distance between com_a and com_b
 Point get_gravity_of_a(int mass_a, Point *com_a, Point *com_b) {
         
-        Point distance = {.x = com_a->x - com_b->x, .y = com_a->y - com_b->y};
-        double angle_to_a = atan2(distance.y, distance.x); 
-        double overall_distance = sqrt(distance.y * distance.y + distance.x * distance.x);
+        Point distance = subtract_a_minus_b(com_a, com_b);
+        double overall_distance = abs_point(&distance);
         double acceleration_gravity = mass_a * GRAVITATIONAL_CONSTANT / (overall_distance * overall_distance + GRAVITATIONAL_DISTANCE_GUARD);
-        return (Point) { .x = acceleration_gravity * cos(angle_to_a), .y = acceleration_gravity * sin(angle_to_a) };
+        return (Point) {.x = acceleration_gravity * fast_cos_atan2(&distance),
+                        .y = acceleration_gravity * fast_sin_atan2(&distance)};
 }
 
 #endif
