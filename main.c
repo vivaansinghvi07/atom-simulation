@@ -7,12 +7,13 @@
 
 #define SCREEN_X 1600
 #define SCREEN_Y 900
-#define ATOM_WIDTH 3
-#define DISPLAY_COLOR COLOR_VELOCITY
+#define MOUSE_MASS 200
+#define ATOM_DISPLAY_WIDTH 7
+#define DISPLAY_COLOR COLOR_RANDOM
 #define CLICK_PLACE_WIDTH 25
-#define CLICK_PLACE_GAP 1
+#define CLICK_PLACE_GAP 5
 
-int N_ATOMS = 0;  
+int N_ATOMS = 0;
 
 typedef struct {
         uint8_t r;
@@ -83,13 +84,13 @@ void display_atoms(SDL_Surface *surface, Atom *atoms, enum ColorMode color_mode)
                                 b = rand() % 255;
                                 break;
                         case COLOR_VELOCITY:
-                                g = b = (int) ((abs_point(&atoms[i].velocity) + min_velocity) / (max_velocity - min_velocity) * 155) + 100;
+                                g = (int) ((abs_point(&atoms[i].velocity) + min_velocity) / (max_velocity - min_velocity) * 255);
                                 break;
                 }
 
                 // apply coloring to each pixel for the atom
-                for (int x = -(ATOM_WIDTH / 2); x < ATOM_WIDTH / 2 + 1; ++x) {
-                        for (int y = -(ATOM_WIDTH / 2); y < ATOM_WIDTH / 2 + 1; ++y) {
+                for (int x = -(ATOM_DISPLAY_WIDTH / 2); x < ATOM_DISPLAY_WIDTH / 2 + 1; ++x) {
+                        for (int y = -(ATOM_DISPLAY_WIDTH / 2); y < ATOM_DISPLAY_WIDTH / 2 + 1; ++y) {
                                 set_pixel(surface, atom_x + x, atom_y + y, (RGB_color){.r = r, .g = g, .b = b});
                         }
                 }
@@ -147,20 +148,27 @@ int main(void) {
         SDL_Surface *surface = SDL_GetWindowSurface(window);
         SDL_Event event;
         int mouse_x, mouse_y;
-        bool quit = false;
+        bool quit = false, gravitation_to_mouse = false;
         while (!quit) {
 
                 SDL_GetMouseState(&mouse_x, &mouse_y);
 
                 while (SDL_PollEvent(&event)) {
                         if (event.type == SDL_QUIT) {
-                                quit = 1;
+                                quit = true;
                         } else if (event.button.button == SDL_BUTTON_LEFT) {
                                 add_atoms_upon_click(&atoms, &N_ATOMS, mouse_x, mouse_y);
+                        } else if (event.button.button == SDL_BUTTON_RIGHT) {
+                                // create a toggle because pressing and letting go each send events
+                                gravitation_to_mouse = !gravitation_to_mouse; 
                         }
                 }
-
+        
                 step_simulation(atoms, N_ATOMS);
+                if (gravitation_to_mouse) {
+                        apply_gravity_to_mouse(atoms, N_ATOMS, mouse_x, mouse_y, MOUSE_MASS);
+                }
+                iterate_kinematics(atoms, N_ATOMS);
                 clear_screen(surface);
                 display_atoms(surface, atoms, DISPLAY_COLOR);
                 SDL_UpdateWindowSurface(window);
