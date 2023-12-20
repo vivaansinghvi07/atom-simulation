@@ -8,8 +8,8 @@
 #define SCREEN_X 1600
 #define SCREEN_Y 900
 #define MOUSE_MASS 200
-#define ATOM_DISPLAY_WIDTH 7
-#define DISPLAY_COLOR COLOR_RANDOM
+#define ATOM_DISPLAY_WIDTH 5
+#define DISPLAY_COLOR COLOR_VELOCITY
 #define CLICK_PLACE_WIDTH 25
 #define CLICK_PLACE_GAP 5
 
@@ -107,7 +107,7 @@ void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_
                 for (int y = -CLICK_PLACE_WIDTH; y < CLICK_PLACE_WIDTH; y += CLICK_PLACE_GAP) {
                         Point atom_location = { .x = mouse_x + x, .y = mouse_y + y};
                         if (sqrt(x*x + y*y) < CLICK_PLACE_WIDTH) {
-                                prepend_to_list(&head, &atom_location);
+                                prepend_to_pointnode_list(&head, &atom_location);
                                 n_new_atoms++;
                         }
                 }
@@ -136,7 +136,7 @@ void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_
         }
         *n_atoms_pointer += n_new_atoms;
 quit:
-        free_list(head);
+        free_pointnode_list(head);
 }
 
 int main(void) {

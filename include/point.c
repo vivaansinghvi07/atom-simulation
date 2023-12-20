@@ -28,10 +28,10 @@ double abs_point(Point *p);
 Point subtract_a_minus_b(Point *a, Point *b);
 
 // prepends a Point to a linked list of PointNodes
-void prepend_to_list(PointNode **head, Point *data);
+void prepend_to_pointnode_list(PointNode **head, Point *data);
 
 // frees a list of PointNodes
-void free_list(PointNode *head);
+void free_pointnode_list(PointNode *head);
 
 /*
  * FUNCTION IMPLEMENTATIONS BELOW
@@ -67,7 +67,7 @@ Point subtract_a_minus_b(Point *a, Point *b) {
 }
 
 // creates a new node and adds it to the beginning of the list, replacing the head
-void prepend_to_list(PointNode **head, Point *data) {
+void prepend_to_pointnode_list(PointNode **head, Point *data) {
         PointNode *new = malloc(sizeof(PointNode)); 
         new->next = *head;
         new->data = *data;
@@ -75,7 +75,7 @@ void prepend_to_list(PointNode **head, Point *data) {
 }
 
 // free a linked list
-void free_list(PointNode *head) {
+void free_pointnode_list(PointNode *head) {
         while (head != NULL) {
                 PointNode *temp = head->next;
                 free(head);
