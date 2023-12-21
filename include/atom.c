@@ -6,6 +6,9 @@
 #ifndef SIM_ATOM
 #define SIM_ATOM
 
+// min number of std devs to consider for removing atoms
+#define MIN_STD_DEV_FOR_REMOVAL 5
+
 // constants for repulsion force between particles
 #define REPULSION_FUNC_A 0.000002
 #define REPULSION_FUNC_B 5
@@ -32,6 +35,15 @@ typedef struct atom_node {
 
 int SIMULATION_STEPS = 0;
 
+// absolute value of a double
+double absd(double d);
+
+// prepends an atomnode to a linked list 
+void prepend_to_atomnode_list(AtomNode **head, Atom *atom);
+
+// free a linked list of atomnodes
+void free_atomnode_list(AtomNode *head);
+
 // generates a list of atoms that have posisions (0 -> x_max / 2, 0 -> y_max / 2)
 Atom *init_atoms(int n_atoms, int x_max, int y_max);
 
@@ -39,7 +51,10 @@ Atom *init_atoms(int n_atoms, int x_max, int y_max);
 void debug_atoms(Atom *atoms, int n_atoms);
 
 // goes to the next simulation step, modifying acceleration and velocity when applicable
-void step_simulation(Atom *atoms, int n_atoms);
+void step_simulation(Atom **atoms, int *n_atoms);
+
+// remove atoms that are too far from the rest
+void remove_faraway_atoms(Atom **atoms_pointer, int *n_atoms_pointer);
 
 // adds the velocity to the position, and the acceleration to the velocity 
 void iterate_kinematics(Atom *atoms, int n_atoms);
@@ -74,6 +89,27 @@ Point get_attractive_repulsive_force_of_a(int mass_a, Point *com_a, Point *com_b
  * END OF PSEUDO HEADER FILE
  */
 
+// absolute value of a double
+double absd(double d) {
+        return d > 0 ? d : -d;
+}
+
+// prepend an atomnode to a linked list of atomnodes
+void prepend_to_atomnode_list(AtomNode **head, Atom *data) {
+        AtomNode *new = malloc(sizeof(AtomNode)); 
+        new->next = *head;
+        new->data = data;
+        *head = new;
+}
+
+void free_atomnode_list(AtomNode *head) {
+        while (head != NULL) {
+                AtomNode *temp = head->next;
+                free(head);
+                head = temp; 
+        }
+}
+
 Atom *init_atoms(int n_atoms, int x_max, int y_max) {
         srand(100);
         Atom *atoms = malloc(sizeof(Atom) * n_atoms);
@@ -105,13 +141,67 @@ void iterate_kinematics(Atom *atoms, int n_atoms) {
         }
 }
 
-void step_simulation(Atom *atoms, int n_atoms) {
+void step_simulation(Atom **atoms, int *n_atoms) {
         SIMULATION_STEPS++;
-        GRAVITATIONAL_FUNCTION(atoms, n_atoms);
+        GRAVITATIONAL_FUNCTION(*atoms, *n_atoms);
         if (SIMULATION_STEPS % 7 == 0) {  // collision detection step
-                apply_collision_detection_naive(atoms, n_atoms);
+                apply_collision_detection_naive(*atoms, *n_atoms);
+                remove_faraway_atoms(atoms, n_atoms);
         }
 }
+
+// removes atoms that are a significant length away from the mean
+void remove_faraway_atoms(Atom **atoms_pointer, int *n_atoms_pointer) {
+
+        // determine average of all the atoms
+        Point center;
+        for (int i = 0; i < *n_atoms_pointer; ++i) {
+                Atom *atom = &(*atoms_pointer)[i];
+                center.x += atom->position.x;
+                center.y += atom->position.y;
+        }
+        center.x /= *n_atoms_pointer;
+        center.y /= *n_atoms_pointer;
+
+        // determine standard deviation of the atoms
+        Point std_dev;
+        for (int i = 0; i < *n_atoms_pointer; ++i) {
+                Atom *atom = &(*atoms_pointer)[i];
+                std_dev.x += pow(center.x - atom->position.x, 2);
+                std_dev.y += pow(center.y - atom->position.y, 2);
+        }
+        std_dev.x = sqrt(std_dev.x / *n_atoms_pointer);
+        std_dev.y = sqrt(std_dev.y / *n_atoms_pointer);
+                
+        // add atoms that are too far from the mean
+        AtomNode *keep_atoms = malloc(sizeof(AtomNode));
+        keep_atoms->data = NULL;  // this will be the last element in the list
+        int n_atoms_kept = 0;
+        for (int i = 0; i < *n_atoms_pointer; ++i) {
+                Atom *atom = &(*atoms_pointer)[i];
+                if (absd(atom->position.x - center.x) <= std_dev.x * MIN_STD_DEV_FOR_REMOVAL && 
+                    absd(atom->position.y - center.y) <= std_dev.y * MIN_STD_DEV_FOR_REMOVAL) {
+                        prepend_to_atomnode_list(&keep_atoms, atom);
+                        n_atoms_kept++;
+                }
+        }
+
+        // reallocate the memory and fill the new list of atoms in reverse to preserve the randomness
+        Atom *new_atoms = malloc(sizeof(Atom) * n_atoms_kept);
+        AtomNode *temp = keep_atoms;  // go to the next one because the first is blank
+        int curr_index = n_atoms_kept - 1;
+        while (temp->data != NULL) {
+                new_atoms[curr_index--] = *temp->data;  // copy the atom to this
+                temp = temp->next;
+        }
+
+        // free old memory and set new values
+        free(*atoms_pointer); 
+        free_atomnode_list(keep_atoms);
+        *atoms_pointer = new_atoms;
+        *n_atoms_pointer = n_atoms_kept;
+}
+
 
 // helper function for the below function, changes an atom's velocity for a collision
 void _apply_new_velocity(Atom *atom, Point *velocity_com, double angle_of_collision) {
