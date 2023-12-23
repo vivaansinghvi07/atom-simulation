@@ -9,12 +9,10 @@ import matplotlib.pyplot as plt
 # therefore, for grids of l = 100, the particle needs to be at least 376 squares away 
 # this seems to have a linear relationship 
 
-A = 0.2
-B = 0.5
-T = 0.95
+T = 0.90  # accuracy threshold
 
 def f(x: int) -> float:
-    return A / x**4 - B / x**3 
+    return 1 / x**2
 
 def g(x: int, n: int) -> float: 
     return (2 * f(x)) / (f(x - n) + f(x + n))
