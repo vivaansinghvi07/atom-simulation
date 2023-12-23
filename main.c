@@ -23,6 +23,10 @@
 #define CLICK_PLACE_WIDTH 50
 #define CLICK_PLACE_GAP 5
 
+// controls how atom count is displayed
+#define TEXT_BLOCK_WIDTH 10
+#define TEXT_OFFSET 20
+
 int N_ATOMS = 0;
 int SIMULATION_STEPS = 0;
 
@@ -146,6 +150,37 @@ int _char_to_disp_map(char c) {
         }
 }
 
+void _draw_block_at(SDL_Surface *surface, int x, int y) {
+        for (int i = 0; i < TEXT_BLOCK_WIDTH; ++i) {
+                for (int j = 0; j < TEXT_BLOCK_WIDTH; ++j) {
+                        set_pixel(surface, x+j, y+i, (RGB_color) {255, 255, 255});
+                }
+        }
+}
+
+void display_atom_count(SDL_Surface *surface, int n_atoms) {
+
+        // create a buffer storing the string
+        int len = snprintf(NULL, 0, "%d", n_atoms);
+        char buf[len + 1];
+        sprintf(buf, "%d", n_atoms);
+
+        // draw each number to the screen 
+        for (int i = 0; i < len; ++i) {
+                int digit_map = _char_to_disp_map(buf[i]);
+                for (int y = 0; y < 5; ++y) {
+                        for (int x = 0; x < 3; ++x) {
+                                if (digit_map & 0b100000000000000) {
+                                        _draw_block_at(surface, TEXT_OFFSET + (i * 4 + x) * TEXT_BLOCK_WIDTH, 
+                                                                TEXT_OFFSET + y * TEXT_BLOCK_WIDTH);
+                                }
+                                digit_map <<= 1;
+                        }
+                }
+        }
+
+}
+
 void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_x, int mouse_y) { 
 
         // fill a list of points in which new atoms are going to go
@@ -215,9 +250,9 @@ void add_rotating_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, i
 void step_simulation(Atom **atoms_pointer, int *n_atoms_pointer) {
         SIMULATION_STEPS++;
         GRAVITATIONAL_FUNCTION(*atoms_pointer, *n_atoms_pointer);
-        // if (SIMULATION_STEPS % 7 == 0) {
-        //         apply_collision_detection_naive(*atoms_pointer, *n_atoms_pointer);
-        // }
+        if (SIMULATION_STEPS % 7 == 0) {
+                apply_collision_detection_naive(*atoms_pointer, *n_atoms_pointer);
+        }
         if (SIMULATION_STEPS % 14 == 0) {
                 remove_faraway_atoms(atoms_pointer, n_atoms_pointer);
         }
@@ -244,11 +279,15 @@ int main(void) {
                                 add_rotating_atoms_upon_click(&atoms, &N_ATOMS, mouse_x, mouse_y);
                         } else if (event.button.button == SDL_BUTTON_RIGHT) {
                                 gravitation_to_mouse = !gravitation_to_mouse; 
-                        } else if (event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) {
+                        } else if (event.type == SDL_KEYUP) {
                                 switch (event.key.keysym.sym) {
-                                        case SDLK_n: showing_n_atoms = !showing_n_atoms; break;
+                                        case SDLK_n: showing_n_atoms = false; break;
                                 }
-                        }
+                        } else if (event.type == SDL_KEYDOWN) {
+                                switch (event.key.keysym.sym) {
+                                        case SDLK_n: showing_n_atoms = true; break;
+                                }
+                        } 
                 }
         
                 step_simulation(&atoms, &N_ATOMS);
