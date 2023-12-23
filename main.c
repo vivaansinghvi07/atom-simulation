@@ -6,15 +6,24 @@
 #include "include/atom.c"
 #include "include/gravity.c"
 
+// dimensions for the SDL window
 #define SCREEN_X 1600
 #define SCREEN_Y 900
+
+// effective mass of the mouse when right click is pressed
 #define MOUSE_MASS 200
-#define ATOM_DISPLAY_WIDTH 1
+
+// width of each atom being displayed to the screen
+#define ATOM_DISPLAY_WIDTH 3
+
+// color mode of coloring the atoms
 #define DISPLAY_COLOR COLOR_VELOCITY
-#define CLICK_PLACE_WIDTH 25
+
+// controls how atoms are placed to the screen
+#define CLICK_PLACE_WIDTH 50
 #define CLICK_PLACE_GAP 5
 
-int N_ATOMS = 20000;
+int N_ATOMS = 0;
 int SIMULATION_STEPS = 0;
 
 typedef struct {
@@ -111,6 +120,32 @@ void display_atoms(SDL_Surface *surface, Atom *atoms, enum ColorMode color_mode)
         }
 }
 
+/* 
+ * 0  1  2
+ * 3  4  6
+ * 6  7  8
+ * 9  10 11
+ * 12 13 14
+ *
+ * Returns an integer where each bit in its binary representation corresponds to a place on this grid
+ * 0b111001001001001  would correspond to bits 0, 1, 2, 6, 8, 11, 14 (from left ro right)
+  */
+int _char_to_disp_map(char c) {
+        switch (c) {
+                case '0': return 0b111101101101111;
+                case '1': return 0b001001001001001; 
+                case '2': return 0b111001111100111;
+                case '3': return 0b111001111001111;
+                case '4': return 0b101101111001001;
+                case '5': return 0b111100111001111;
+                case '6': return 0b111100111101111;
+                case '7': return 0b111001001001001;
+                case '8': return 0b111101111101111;
+                case '9': return 0b111101111001111;
+                default:  return 0b000000000000000;
+        }
+}
+
 void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_x, int mouse_y) { 
 
         // fill a list of points in which new atoms are going to go
@@ -154,6 +189,29 @@ quit:
         free_pointnode_list(head);
 }
 
+void add_rotating_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_x, int mouse_y) { 
+
+        // add the atoms normally
+        int old_n_atoms = *n_atoms_pointer;
+        add_atoms_upon_click(atoms_pointer, n_atoms_pointer, mouse_x, mouse_y);
+
+        // go through each other atom and determine the resulting velocity
+        double acceleration_gravity = 0.2 / (CLICK_PLACE_GAP * CLICK_PLACE_GAP);  // TODO: MODIFY THIS
+        Point mouse_pos = (Point) {.x = mouse_x, .y = mouse_y};
+        for (int i = old_n_atoms; i < *n_atoms_pointer; ++i) {
+
+                // calculate the resulting velocity
+                Atom *atom = *atoms_pointer + i;
+                Point distance = subtract_a_minus_b(&mouse_pos, &atom->position);
+                double velocity = sqrt(acceleration_gravity * abs_point(&distance));  // \sqrt{a * r} 
+                
+                // apply the velocity to be tangent 
+                atom->velocity = (Point) {.x = velocity * -fast_sin_atan2(&distance),
+                                          .y = velocity * fast_cos_atan2(&distance)};
+        }
+
+}
+
 void step_simulation(Atom **atoms_pointer, int *n_atoms_pointer) {
         SIMULATION_STEPS++;
         GRAVITATIONAL_FUNCTION(*atoms_pointer, *n_atoms_pointer);
@@ -165,7 +223,6 @@ void step_simulation(Atom **atoms_pointer, int *n_atoms_pointer) {
         }
 }
 
-
 int main(void) {
         Atom *atoms = init_atoms(N_ATOMS, SCREEN_X, SCREEN_Y);
         SDL_Window *window = SDL_CreateWindow(
@@ -175,7 +232,7 @@ int main(void) {
         SDL_Surface *surface = SDL_GetWindowSurface(window);
         SDL_Event event;
         int mouse_x, mouse_y;
-        bool quit = false, gravitation_to_mouse = false;
+        bool quit = false, gravitation_to_mouse = false, showing_n_atoms = false;
         while (!quit) {
 
                 SDL_GetMouseState(&mouse_x, &mouse_y);
@@ -183,11 +240,14 @@ int main(void) {
                 while (SDL_PollEvent(&event)) {
                         if (event.type == SDL_QUIT) {
                                 quit = true;
-                        } else if (event.button.button == SDL_BUTTON_LEFT) {
-                                add_atoms_upon_click(&atoms, &N_ATOMS, mouse_x, mouse_y);
+                        } else if (event.button.button == SDL_BUTTON_LEFT && event.button.state) {
+                                add_rotating_atoms_upon_click(&atoms, &N_ATOMS, mouse_x, mouse_y);
                         } else if (event.button.button == SDL_BUTTON_RIGHT) {
-                                // create a toggle because pressing and letting go each send events
                                 gravitation_to_mouse = !gravitation_to_mouse; 
+                        } else if (event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) {
+                                switch (event.key.keysym.sym) {
+                                        case SDLK_n: showing_n_atoms = !showing_n_atoms; break;
+                                }
                         }
                 }
         
@@ -198,6 +258,9 @@ int main(void) {
                 iterate_kinematics(atoms, N_ATOMS);
                 clear_screen(surface);
                 display_atoms(surface, atoms, DISPLAY_COLOR);
+                if (showing_n_atoms) {
+                        display_atom_count(surface, N_ATOMS);
+                }
                 SDL_UpdateWindowSurface(window);
         }
         return 0;
