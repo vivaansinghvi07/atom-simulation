@@ -8,12 +8,12 @@
 #define SCREEN_X 1600
 #define SCREEN_Y 900
 #define MOUSE_MASS 200
-#define ATOM_DISPLAY_WIDTH 5
+#define ATOM_DISPLAY_WIDTH 1
 #define DISPLAY_COLOR COLOR_VELOCITY
 #define CLICK_PLACE_WIDTH 25
 #define CLICK_PLACE_GAP 5
 
-int N_ATOMS = 0;
+int N_ATOMS = 20000;
 
 typedef struct {
         uint8_t r;
@@ -124,14 +124,15 @@ void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_
 
         // create each new atom and add it to the array
         int current_atom = *n_atoms_pointer;
-        while (head != NULL) {
+        PointNode *temp = head;
+        while (temp != NULL) {
                 (*atoms_pointer)[current_atom] = (Atom) {
                         .mass = 1,
-                        .position = (Point) { .x = head->data.x, .y = head->data.y },
+                        .position = (Point) { .x = temp->data.x, .y = temp->data.y },
                         .velocity = (Point) {0},
                         .acceleration = (Point) {0}
                 };
-                head = head->next;
+                temp = temp->next;
                 current_atom++;
         }
         *n_atoms_pointer += n_new_atoms;
@@ -164,7 +165,7 @@ int main(void) {
                         }
                 }
         
-                step_simulation(atoms, N_ATOMS);
+                step_simulation(&atoms, &N_ATOMS);
                 if (gravitation_to_mouse) {
                         apply_gravity_to_mouse(atoms, N_ATOMS, mouse_x, mouse_y, MOUSE_MASS);
                 }
