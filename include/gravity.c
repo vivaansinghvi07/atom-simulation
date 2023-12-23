@@ -267,7 +267,6 @@ void apply_gravity_to_center(Atom *atoms, int n_atoms) {
 // g = \frac{G * m_i}{r_i^2}
 // where r_i is the distance between com_a and com_b
 Point get_gravity_of_a(int mass_a, Point *com_a, Point *com_b) {
-        
         Point distance = subtract_a_minus_b(com_a, com_b);
         double overall_distance = abs_point(&distance);
         double acceleration_gravity = mass_a * GRAVITATIONAL_CONSTANT / (overall_distance * overall_distance + GRAVITATIONAL_DISTANCE_GUARD);
