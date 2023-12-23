@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "include/point.c"
 #include "include/atom.c"
+#include "include/gravity.c"
 
 #define SCREEN_X 1600
 #define SCREEN_Y 900
@@ -14,6 +15,7 @@
 #define CLICK_PLACE_GAP 5
 
 int N_ATOMS = 20000;
+int SIMULATION_STEPS = 0;
 
 typedef struct {
         uint8_t r;
@@ -27,10 +29,22 @@ enum ColorMode {
         COLOR_VELOCITY
 };
 
+// change a single pixel to a given color on the sdl surface
 void set_pixel(SDL_Surface *surface, int x, int y, RGB_color color);
+
+// make an sdl surface entirely black
 void clear_screen(SDL_Surface *surface);
+
+// display a given array of atoms
 void display_atoms(SDL_Surface *surface, Atom *atoms, enum ColorMode color_mode);
+
+// add atoms when the mouse is clicked
 void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_x, int mouse_y);
+
+// step the simulation
+void step_simulation(Atom **atoms_pointer, int *n_atoms_pointer);
+
+// main loop
 int main(void);
 
 // https://github.com/MikeShah/SDL2_Tutorials/blob/main/8_ModifyingSurface/main.cpp
@@ -139,6 +153,18 @@ void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_
 quit:
         free_pointnode_list(head);
 }
+
+void step_simulation(Atom **atoms_pointer, int *n_atoms_pointer) {
+        SIMULATION_STEPS++;
+        GRAVITATIONAL_FUNCTION(*atoms_pointer, *n_atoms_pointer);
+        // if (SIMULATION_STEPS % 7 == 0) {
+        //         apply_collision_detection_naive(*atoms_pointer, *n_atoms_pointer);
+        // }
+        if (SIMULATION_STEPS % 14 == 0) {
+                remove_faraway_atoms(atoms_pointer, n_atoms_pointer);
+        }
+}
+
 
 int main(void) {
         Atom *atoms = init_atoms(N_ATOMS, SCREEN_X, SCREEN_Y);
