@@ -23,9 +23,20 @@
 #define GRAVITATIONAL_FUNCTION apply_gravity_approx
 
 typedef struct {
+        Point max_values, min_values;
+} Box;
+
+typedef struct {
         Point center_of_mass;
         int total_mass;
 } MassApprox;
+
+typedef struct quad_tree_node {
+        struct quad_tree_node *top_left, *top_right, *bottom_left, *bottom_right;
+        int total_mass;
+        Box bounds;
+        Point center_of_mass;
+} QuadTreeNode;
 
 // applies gravity towards the mouse for each point 
 void apply_gravity_to_mouse(Atom *atoms, int n_atoms, int mouse_x, int mouse_y, int mouse_mass);
@@ -55,34 +66,39 @@ int _determine_grid_index(Point *position, Point *min_values, Point *max_values,
         return y_index * grid_size + x_index;
 }
 
-void apply_gravity_approx(Atom *atoms, int n_atoms) {
-        
-        // determine the min and max value of all the atoms, which shouldn't be too big b/c of removals
-        Point min_values, max_values;
+Box determine_bounds(Atom *atoms, int n_atoms) {
+        Box output;
         for (int i = 0; i < n_atoms; ++i) {
                 Atom *atom = atoms + i;
                 double pos_x = atom->position.x;
                 double pos_y = atom->position.y;
                 
-                // values for min and max x and y respectively 
-                if (min_values.x > pos_x) {
-                        min_values.x = pos_x;
-                } else if (max_values.x < pos_x) {
-                        max_values.x = pos_x; 
+                // values for output and max x and y respectively 
+                if (output.min_values.x > pos_x) {
+                        output.min_values.x = pos_x;
+                } else if (output.max_values.x < pos_x) {
+                        output.max_values.x = pos_x; 
                 }
-                if (min_values.y > pos_y) {
-                        min_values.y = pos_y;
-                } else if (max_values.y < pos_y){ 
-                        max_values.y = pos_y; 
+                if (output.min_values.y > pos_y) {
+                        output.min_values.y = pos_y;
+                } else if (output.max_values.y < pos_y){ 
+                        output.max_values.y = pos_y; 
                 }
         }
+        return output;
+}
+
+void apply_gravity_approx(Atom *atoms, int n_atoms) {
+        
+        // determine the min and max value of all the atoms, which shouldn't be too big b/c of removals
+        Box bounds = determine_bounds(atoms, n_atoms);
+        Point min_values = bounds.min_values;
+        Point max_values = bounds.max_values;
 
         // create new arrays to hold information
-        MassApprox *outer_grid = malloc(sizeof(MassApprox) * OUTER_GRID_LEN);
-        MassApprox *inner_grid = malloc(sizeof(MassApprox) * INNER_GRID_LEN);
+        MassApprox *outer_grid = calloc(OUTER_GRID_LEN, sizeof(MassApprox));
+        MassApprox *inner_grid = calloc(INNER_GRID_LEN, sizeof(MassApprox));
         AtomNode **atomnode_grid = malloc(sizeof(AtomNode *) * INNER_GRID_LEN);
-        memset(outer_grid, 0, sizeof(MassApprox) * OUTER_GRID_LEN);
-        memset(inner_grid, 0, sizeof(MassApprox) * INNER_GRID_LEN);
 
         // initialize the data of each linked list to be null 
         for (int i = 0; i < INNER_GRID_LEN; ++i) {
@@ -272,6 +288,93 @@ Point get_gravity_of_a(int mass_a, Point *com_a, Point *com_b) {
         double acceleration_gravity = mass_a * GRAVITATIONAL_CONSTANT / (overall_distance * overall_distance + GRAVITATIONAL_DISTANCE_GUARD);
         return (Point) {.x = acceleration_gravity * fast_cos_atan2(&distance),
                         .y = acceleration_gravity * fast_sin_atan2(&distance)};
+}
+
+// key assumption: the top-left corner is the origin with greater y-values being lower
+QuadTreeNode *_get_target_child(Point *pos, QuadTreeNode *root) {
+        Point bound_diffs = subtract_a_minus_b(&root->bounds.max_values, &root->bounds.min_values);
+        Point atom_diffs = subtract_a_minus_b(pos, &root->bounds.min_values);
+        int x_on_lower = atom_diffs.x / bound_diffs.x < 0.5;
+        int y_on_lower = atom_diffs.y / bound_diffs.y < 0.5;
+        switch (x_on_lower + y_on_lower * 2) { 
+                case 0: return root->top_left;
+                case 1: return root->top_right;
+                case 2: return root->bottom_left;
+                case 3: return root->bottom_right;
+                default:
+                        printf("Something went wrong\n.");
+                        exit(1);
+        }
+}
+
+void _create_new_children(QuadTreeNode *root) {
+
+        // initialize the memory with zeros to make sure nothing funny happens
+        root->top_left = calloc(1, sizeof(QuadTreeNode));
+        root->top_right = calloc(1, sizeof(QuadTreeNode));
+        root->bottom_left = calloc(1, sizeof(QuadTreeNode));
+        root->bottom_right = calloc(1, sizeof(QuadTreeNode));
+
+        // determine some values for the bounds
+        double midway_y = (root->bounds.max_values.y - root->bounds.min_values.y) / 2;
+        double midway_x = (root->bounds.max_values.x - root->bounds.min_values.x) / 2;
+
+        // set their new bounds
+        root->top_left->bounds = (Box) {.min_values = root->bounds.min_values,
+                                        .max_values = (Point) {.x = midway_x, .y = midway_y}};
+        root->top_right->bounds = (Box) {.min_values = (Point) {.x = midway_x, .y = root->bounds.min_values.y},
+                                         .max_values = (Point) {.x = root->bounds.max_values.x, .y = midway_y}};
+        root->bottom_left->bounds = (Box) {.min_values = (Point) {.x = root->bounds.min_values.x, .y = midway_y},
+                                           .max_values = (Point) {.x = midway_x, root->bounds.max_values.y}};
+        root->bottom_right->bounds = (Box) {.min_values = (Point) {.x = midway_x, .y = midway_y},
+                                            .max_values = root->bounds.max_values };
+}
+
+void _adjust_total_mass_and_center(Atom *atom, QuadTreeNode *root) {
+        int old_mass = root->total_mass;
+        root->total_mass += atom->mass;
+        root->center_of_mass.x = (root->center_of_mass.x * old_mass + atom->position.x * atom->mass) / root->total_mass;
+        root->center_of_mass.y = (root->center_of_mass.y * old_mass + atom->position.y * atom->mass) / root->total_mass;
+}
+
+void add_atom_to_quad_tree(Atom *atom, QuadTreeNode *root) {
+        if (root->bounds.max_values.x - root->bounds.min_values.x < 1 ||
+            root->bounds.max_values.y - root->bounds.min_values.y < 1) {
+                return;  // error here, atom can't possibly be put here and this is for safety
+        }
+        if (!root->total_mass) {  // when the node is not initialized
+                root->center_of_mass = atom->position;
+                root->total_mass = atom->mass;
+        } else if (!root->top_left) {  // when the node has no children
+                
+                // Note: this also takes care of creating new boxes 
+                _create_new_children(root);
+
+                // put the atom that was currently in the root into the new quadrant
+                QuadTreeNode *new_quadrant = _get_target_child(&root->center_of_mass, root);
+                new_quadrant->center_of_mass = root->center_of_mass;
+                new_quadrant->total_mass = root->total_mass;
+        
+                // insert the atom into this quadrant
+                QuadTreeNode *atom_quadrant = _get_target_child(&atom->position, root);
+                add_atom_to_quad_tree(atom, atom_quadrant);
+                _adjust_total_mass_and_center(atom, root);
+
+        } else {
+                // simply insert into the correct quadrant and change values
+                QuadTreeNode *atom_quadrant = _get_target_child(&atom->position, root);
+                add_atom_to_quad_tree(atom, atom_quadrant);
+                _adjust_total_mass_and_center(atom, root);
+        }
+}
+
+QuadTreeNode *build_barnes_hut_tree(Atom *atoms, int n_atoms) {
+        QuadTreeNode *root = calloc(1, sizeof(QuadTreeNode));
+        root->bounds = determine_bounds(atoms, n_atoms);
+        for (int i = 0; i < n_atoms; ++i) {
+                add_atom_to_quad_tree(atoms + i, root);
+        }
+        return root;
 }
 
 #endif
