@@ -316,8 +316,8 @@ void _create_new_children(QuadTreeNode *root) {
         root->bottom_right = calloc(1, sizeof(QuadTreeNode));
 
         // determine some values for the bounds
-        double midway_y = (root->bounds.max_values.y - root->bounds.min_values.y) / 2;
-        double midway_x = (root->bounds.max_values.x - root->bounds.min_values.x) / 2;
+        double midway_y = (root->bounds.max_values.y + root->bounds.min_values.y) / 2;
+        double midway_x = (root->bounds.max_values.x + root->bounds.min_values.x) / 2;
 
         // set their new bounds
         root->top_left->bounds = (Box) {.min_values = root->bounds.min_values,
