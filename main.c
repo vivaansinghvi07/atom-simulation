@@ -20,7 +20,7 @@
 #define DISPLAY_COLOR COLOR_VELOCITY
 
 // controls how atoms are placed to the screen
-#define CLICK_PLACE_WIDTH 50
+#define CLICK_PLACE_WIDTH 75
 #define CLICK_PLACE_GAP 5
 
 // controls how atom count is displayed
@@ -231,14 +231,15 @@ void add_rotating_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, i
         add_atoms_upon_click(atoms_pointer, n_atoms_pointer, mouse_x, mouse_y);
 
         // go through each other atom and determine the resulting velocity
-        double acceleration_gravity = 0.2 / (CLICK_PLACE_GAP * CLICK_PLACE_GAP);  // TODO: MODIFY THIS
+        // i tried to calculate this but it wasn't working so this is what we are gonna run with
+        double acceleration_gravity = GRAVITATIONAL_CONSTANT * M_PI / (CLICK_PLACE_GAP * CLICK_PLACE_GAP * 400);
         Point mouse_pos = (Point) {.x = mouse_x, .y = mouse_y};
         for (int i = old_n_atoms; i < *n_atoms_pointer; ++i) {
 
                 // calculate the resulting velocity
                 Atom *atom = *atoms_pointer + i;
                 Point distance = subtract_a_minus_b(&mouse_pos, &atom->position);
-                double velocity = sqrt(acceleration_gravity * abs_point(&distance));  // \sqrt{a * r} 
+                double velocity = sqrt(acceleration_gravity * pow(abs_point(&distance), 2)); 
                 
                 // apply the velocity to be tangent 
                 atom->velocity = (Point) {.x = velocity * -fast_sin_atan2(&distance),
@@ -250,9 +251,9 @@ void add_rotating_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, i
 void step_simulation(Atom **atoms_pointer, int *n_atoms_pointer) {
         SIMULATION_STEPS++;
         GRAVITATIONAL_FUNCTION(*atoms_pointer, *n_atoms_pointer);
-        if (SIMULATION_STEPS % 7 == 0) {
-                apply_collision_detection_naive(*atoms_pointer, *n_atoms_pointer);
-        }
+        // if (SIMULATION_STEPS % 7 == 0) {
+        //         apply_collision_detection_naive(*atoms_pointer, *n_atoms_pointer);
+        // }
         if (SIMULATION_STEPS % 14 == 0) {
                 remove_faraway_atoms(atoms_pointer, n_atoms_pointer);
         }

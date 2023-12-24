@@ -14,7 +14,7 @@
 #define REPULSION_FUNC_B 5
 
 // min distance between two centers to not be considered a collision
-#define COLLISION_ATOM_WIDTH 15 
+#define COLLISION_ATOM_WIDTH 10
 
 typedef struct {
         int mass;
