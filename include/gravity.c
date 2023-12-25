@@ -1,6 +1,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "point.c"
 #include "atom.c"
 
@@ -21,6 +22,9 @@
 #define GRAVITATIONAL_CONSTANT 0.8
 #define GRAVITATIONAL_DISTANCE_GUARD 20000
 #define GRAVITATIONAL_FUNCTION apply_gravity_approx
+
+// this is theta as defined here: https://en.wikipedia.org/wiki/Barnes%E2%80%93Hut_simulation#Algorithm
+#define BARNES_HUT_THRESHOLD 0.9
 
 typedef struct {
         Point max_values, min_values;
@@ -375,6 +379,31 @@ QuadTreeNode *build_barnes_hut_tree(Atom *atoms, int n_atoms) {
                 add_atom_to_quad_tree(atoms + i, root);
         }
         return root;
+}
+
+double max(double a, double b) {
+        return a > b ? a : b;
+}
+
+Point calculate_barnes_hut_gravity(Atom *atom, QuadTreeNode *root) {
+        if (!root->total_mass) {
+                return (Point) {0};
+        } else if (!root->top_left || max(root->bounds.max_values.y - root->bounds.min_values.y,
+                                          root->bounds.max_values.x - root->bounds.min_values.x) < BARNES_HUT_THRESHOLD) { 
+                return get_gravity_of_a(root->total_mass, &root->center_of_mass, &atom->position);
+        } else {
+                // this is needlessly complicated due to my own bad design :(
+                Point output = (Point) {0};
+                Point top_left_sum = calculate_barnes_hut_gravity(atom, root->top_left),
+                      top_right_sum = calculate_barnes_hut_gravity(atom, root->top_right),
+                      bottom_left_sum = calculate_barnes_hut_gravity(atom, root->bottom_left),
+                      bottom_right_sum = calculate_barnes_hut_gravity(atom, root->bottom_right);
+                output = add_points(&output, &top_left_sum);
+                output = add_points(&output, &top_right_sum);
+                output = add_points(&output, &bottom_left_sum);
+                output = add_points(&output, &bottom_right_sum);
+                return output;
+        }
 }
 
 #endif
