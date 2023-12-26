@@ -22,7 +22,7 @@
 // modifications for gravitational functions
 #define GRAVITATIONAL_CONSTANT 8
 #define GRAVITATIONAL_DISTANCE_GUARD 20000
-#define GRAVITATIONAL_FUNCTION apply_gravity_each_point_naive
+#define GRAVITATIONAL_FUNCTION apply_gravity_barnes_hut
 
 // this is theta as defined here: https://en.wikipedia.org/wiki/Barnes%E2%80%93Hut_simulation#Algorithm
 #define BARNES_HUT_THRESHOLD 0.6
@@ -422,7 +422,9 @@ Point calculate_barnes_hut_gravity(Atom *atom, QuadTreeNode *root) {
         if (!root->total_mass) {
                 return (Point) {0};
         } else if (!root->top_left || max(root->bounds.max_values.y - root->bounds.min_values.y,
-                                          root->bounds.max_values.x - root->bounds.min_values.x) < BARNES_HUT_THRESHOLD) { 
+                                          root->bounds.max_values.x - root->bounds.min_values.x) / 
+                                      abs_point(&(Point) {.x = atom->position.x - root->center_of_mass.x, 
+                                                          .y = atom->position.y - root->center_of_mass.y}) < BARNES_HUT_THRESHOLD) { 
                 return get_gravity_of_a(root->total_mass, &root->center_of_mass, &atom->position);
         } else {
                 Point top_left_sum = calculate_barnes_hut_gravity(atom, root->top_left),
