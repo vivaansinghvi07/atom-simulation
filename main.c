@@ -11,24 +11,24 @@
 #define SCREEN_Y 900
 
 // effective mass of the mouse when right click is pressed
-#define MOUSE_MASS 200
+#define MOUSE_MASS 2000
 
 // width of each atom being displayed to the screen
 #define ATOM_DISPLAY_WIDTH 3
 
 // color mode of coloring the atoms
-#define DISPLAY_COLOR COLOR_NONE
+#define DISPLAY_COLOR COLOR_VELOCITY
 
 // controls how atoms are placed to the screen
 #define CLICK_PLACE_FUNC add_atoms_upon_click
-#define CLICK_PLACE_WIDTH 25
+#define CLICK_PLACE_WIDTH 75
 #define CLICK_PLACE_GAP 5
 
 // controls how atom count is displayed
 #define TEXT_BLOCK_WIDTH 10
 #define TEXT_OFFSET 20
 
-int N_ATOMS = 2;
+int N_ATOMS = 0;
 int SIMULATION_STEPS = 0;
 
 typedef struct {
@@ -321,7 +321,10 @@ int main(void) {
         SDL_Surface *surface = SDL_GetWindowSurface(window);
         SDL_Event event;
         int mouse_x, mouse_y;
-        bool quit = false, gravitation_to_mouse = false, showing_n_atoms = false;
+        bool quit = false, 
+             gravitation_to_mouse = false, 
+             showing_n_atoms = false,
+             showing_barnes_hut_tree = false;
         while (!quit) {
 
                 SDL_GetMouseState(&mouse_x, &mouse_y);
@@ -336,10 +339,12 @@ int main(void) {
                         } else if (event.type == SDL_KEYUP) {
                                 switch (event.key.keysym.sym) {
                                         case SDLK_n: showing_n_atoms = false; break;
+                                        case SDLK_d: showing_barnes_hut_tree = false; break;
                                 }
                         } else if (event.type == SDL_KEYDOWN) {
                                 switch (event.key.keysym.sym) {
                                         case SDLK_n: showing_n_atoms = true; break;
+                                        case SDLK_d: showing_barnes_hut_tree = true; break;
                                 }
                         } 
                 }
@@ -350,7 +355,9 @@ int main(void) {
                 }
                 iterate_kinematics(atoms, N_ATOMS);
                 clear_screen(surface);
-                // display_barnes_hut_tree(surface, build_barnes_hut_tree(atoms, N_ATOMS), 0);
+                if (showing_barnes_hut_tree) {
+                        display_barnes_hut_tree(surface, build_barnes_hut_tree(atoms, N_ATOMS), 0);
+                }
                 display_atoms(surface, atoms, DISPLAY_COLOR);
                 if (showing_n_atoms) {
                         display_atom_count(surface, N_ATOMS);
