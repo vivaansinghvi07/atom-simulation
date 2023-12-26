@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -19,12 +20,12 @@
 #define GRID_WIDTH_THRESHOLD 3
 
 // modifications for gravitational functions
-#define GRAVITATIONAL_CONSTANT 0.8
+#define GRAVITATIONAL_CONSTANT 8
 #define GRAVITATIONAL_DISTANCE_GUARD 20000
-#define GRAVITATIONAL_FUNCTION apply_gravity_approx
+#define GRAVITATIONAL_FUNCTION apply_gravity_each_point_naive
 
 // this is theta as defined here: https://en.wikipedia.org/wiki/Barnes%E2%80%93Hut_simulation#Algorithm
-#define BARNES_HUT_THRESHOLD 0.9
+#define BARNES_HUT_THRESHOLD 0.6
 
 typedef struct {
         Point max_values, min_values;
@@ -72,6 +73,8 @@ int _determine_grid_index(Point *position, Point *min_values, Point *max_values,
 
 Box determine_bounds(Atom *atoms, int n_atoms) {
         Box output;
+        output.max_values = (Point) {0};
+        output.min_values = (Point) {.x = INT16_MAX, .y = INT16_MAX};
         for (int i = 0; i < n_atoms; ++i) {
                 Atom *atom = atoms + i;
                 double pos_x = atom->position.x;
@@ -80,12 +83,14 @@ Box determine_bounds(Atom *atoms, int n_atoms) {
                 // values for output and max x and y respectively 
                 if (output.min_values.x > pos_x) {
                         output.min_values.x = pos_x;
-                } else if (output.max_values.x < pos_x) {
+                }
+                if (output.max_values.x < pos_x) {
                         output.max_values.x = pos_x; 
                 }
                 if (output.min_values.y > pos_y) {
                         output.min_values.y = pos_y;
-                } else if (output.max_values.y < pos_y){ 
+                } 
+                if (output.max_values.y < pos_y){ 
                         output.max_values.y = pos_y; 
                 }
         }
@@ -298,9 +303,9 @@ Point get_gravity_of_a(int mass_a, Point *com_a, Point *com_b) {
 QuadTreeNode *_get_target_child(Point *pos, QuadTreeNode *root) {
         Point bound_diffs = subtract_a_minus_b(&root->bounds.max_values, &root->bounds.min_values);
         Point atom_diffs = subtract_a_minus_b(pos, &root->bounds.min_values);
-        int x_on_lower = atom_diffs.x / bound_diffs.x < 0.5;
-        int y_on_lower = atom_diffs.y / bound_diffs.y < 0.5;
-        switch (x_on_lower + y_on_lower * 2) { 
+        int x_on_upper = atom_diffs.x / bound_diffs.x > 0.5;
+        int y_on_upper = atom_diffs.y / bound_diffs.y > 0.5;
+        switch (x_on_upper + y_on_upper * 2) { 
                 case 0: return root->top_left;
                 case 1: return root->top_right;
                 case 2: return root->bottom_left;
@@ -361,7 +366,7 @@ void add_atom_to_quad_tree(Atom *atom, QuadTreeNode *root) {
         
                 // insert the atom into this quadrant
                 QuadTreeNode *atom_quadrant = _get_target_child(&atom->position, root);
-                add_atom_to_quad_tree(atom, atom_quadrant);
+                add_atom_to_quad_tree(atom, atom_quadrant);    // what happens here? 
                 _adjust_total_mass_and_center(atom, root);
 
         } else {
@@ -381,6 +386,34 @@ QuadTreeNode *build_barnes_hut_tree(Atom *atoms, int n_atoms) {
         return root;
 }
 
+void debug_barnes_hut_tree(QuadTreeNode *root, int depth, int max_depth) {
+        if (depth >= max_depth) {
+                return;
+        }
+        for (int i = 0; i < depth; ++i) {
+                printf("  ");
+        }
+        printf("Center of mass: (%f, %f)\n", root->center_of_mass.x, root->center_of_mass.y);
+        for (int i = 0; i < depth; ++i) {
+                printf("  ");
+        }
+        printf("Total mass: %d\n", root->total_mass);
+        for (int i = 0; i < depth; ++i) {
+                printf("  ");
+        }
+        printf("Box max values: (%f, %f)\n", root->bounds.max_values.x, root->bounds.max_values.y);
+        for (int i = 0; i < depth; ++i) {
+                printf("  ");
+        }
+        printf("Box min values: (%f, %f)\n", root->bounds.min_values.x, root->bounds.min_values.y);
+        if (root->top_left) {
+                debug_barnes_hut_tree(root->top_left, depth + 1, max_depth);
+                debug_barnes_hut_tree(root->top_right, depth + 1, max_depth);
+                debug_barnes_hut_tree(root->bottom_left, depth + 1, max_depth);
+                debug_barnes_hut_tree(root->bottom_right, depth + 1, max_depth);
+        }
+}
+
 double max(double a, double b) {
         return a > b ? a : b;
 }
@@ -392,17 +425,23 @@ Point calculate_barnes_hut_gravity(Atom *atom, QuadTreeNode *root) {
                                           root->bounds.max_values.x - root->bounds.min_values.x) < BARNES_HUT_THRESHOLD) { 
                 return get_gravity_of_a(root->total_mass, &root->center_of_mass, &atom->position);
         } else {
-                // this is needlessly complicated due to my own bad design :(
-                Point output = (Point) {0};
                 Point top_left_sum = calculate_barnes_hut_gravity(atom, root->top_left),
                       top_right_sum = calculate_barnes_hut_gravity(atom, root->top_right),
                       bottom_left_sum = calculate_barnes_hut_gravity(atom, root->bottom_left),
                       bottom_right_sum = calculate_barnes_hut_gravity(atom, root->bottom_right);
-                output = add_points(&output, &top_left_sum);
-                output = add_points(&output, &top_right_sum);
-                output = add_points(&output, &bottom_left_sum);
-                output = add_points(&output, &bottom_right_sum);
-                return output;
+                return (Point) {.x = top_left_sum.x + top_right_sum.x + bottom_right_sum.x + bottom_left_sum.x,
+                                .y = top_left_sum.y + top_right_sum.y + bottom_right_sum.y + bottom_left_sum.y};
+        }
+}
+
+void apply_gravity_barnes_hut(Atom *atoms, int n_atoms) {
+        QuadTreeNode *root = build_barnes_hut_tree(atoms, n_atoms);
+        // debug_barnes_hut_tree(root, 0, 10);
+        for (int i = 0; i < n_atoms; ++i) {
+                Atom *atom = atoms + i;
+                Point acceleration_gravity = calculate_barnes_hut_gravity(atom, root);
+                atom->acceleration.x += acceleration_gravity.x;
+                atom->acceleration.y += acceleration_gravity.y;
         }
 }
 
