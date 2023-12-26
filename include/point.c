@@ -27,9 +27,6 @@ double abs_point(Point *p);
 // returns a new point that is the difference of a and b
 Point subtract_a_minus_b(Point *a, Point *b);
 
-// adds two points together 
-Point add_points(Point *a, Point *b);
-
 // prepends a Point to a linked list of PointNodes
 void prepend_to_pointnode_list(PointNode **head, Point *data);
 
@@ -67,11 +64,6 @@ double abs_point(Point *p) {
 // denotes the subtraction operation of two points
 Point subtract_a_minus_b(Point *a, Point *b) {
         return (Point) {.x = a->x - b->x, .y = a->y - b->y};
-}
-
-// adds two points together
-Point add_points(Point *a, Point *b) {
-        return (Point) {.x = a->x + b->x, .y = a->y + b->y};
 }
 
 // creates a new node and adds it to the beginning of the list, replacing the head
