@@ -347,9 +347,9 @@ void _adjust_total_mass_and_center(Atom *atom, QuadTreeNode *root) {
 }
 
 void add_atom_to_quad_tree(Atom *atom, QuadTreeNode *root) {
-        if (root->bounds.max_values.x - root->bounds.min_values.x < 1 ||
-            root->bounds.max_values.y - root->bounds.min_values.y < 1) {
-                return;  // error here, atom can't possibly be put here and this is for safety
+        if (root->bounds.max_values.x - root->bounds.min_values.x < 0.1 ||
+            root->bounds.max_values.y - root->bounds.min_values.y < 0.1) {
+                return;  // safety net from going too small, program crashes without this
         }
         if (!root->total_mass) {  // when the node is not initialized
                 root->center_of_mass = atom->position;
