@@ -22,7 +22,7 @@ if __name__ == "__main__":
     ans = []
     for n in test_n:
         for j in range(n + 1, 1000):
-            if g(j, n) >= T:
+            if g(j, n // 2) >= T:
                 break
         ans.append(j)
     print(*zip(test_n, ans), sep="\n")
