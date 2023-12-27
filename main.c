@@ -21,7 +21,7 @@
 #define DISPLAY_COLOR COLOR_NONE
 
 // controls how atoms are placed to the screen
-#define CLICK_PLACE_FUNC add_atoms_upon_click
+#define CLICK_PLACE_FUNC add_rotating_atoms_upon_click
 #define CLICK_PLACE_WIDTH 75
 #define CLICK_PLACE_GAP 5
 
@@ -29,6 +29,7 @@
 #define TEXT_BLOCK_WIDTH 10
 #define TEXT_OFFSET 20
 
+bool COLLISION_DETECTION_ON = false;
 int N_ATOMS = 0;
 int SIMULATION_STEPS = 0;
 
@@ -334,9 +335,9 @@ void display_barnes_hut_tree(SDL_Surface *surface, QuadTreeNode *root, int depth
 void step_simulation(Atom **atoms_pointer, int *n_atoms_pointer) {
         SIMULATION_STEPS++;
         GRAVITATIONAL_FUNCTION(*atoms_pointer, *n_atoms_pointer);
-        // if (SIMULATION_STEPS % 7 == 0) {
-        //         apply_collision_detection_naive(*atoms_pointer, *n_atoms_pointer);
-        // }
+        if (COLLISION_DETECTION_ON) {
+                apply_collision_detection_naive(*atoms_pointer, *n_atoms_pointer);
+        }
         if (SIMULATION_STEPS % 14 == 0) {
                 remove_faraway_atoms(atoms_pointer, n_atoms_pointer);
         }
@@ -366,7 +367,8 @@ int main(void) {
              gravitation_to_mouse = false;
         KeySwitch showing_n_atoms = { .ready = true, .on = false },
                   showing_barnes_hut_tree = { .ready = true, .on = false },
-                  showing_fps = { .ready = true, .on = false };
+                  showing_fps = { .ready = true, .on = false },
+                  reset_atoms = { .ready = true, .on = false };
         double fps_start = 0;
         while (!quit) {
 
@@ -384,6 +386,7 @@ int main(void) {
                                         case SDLK_n: showing_n_atoms.ready = true; break;
                                         case SDLK_d: showing_barnes_hut_tree.ready = true; break;
                                         case SDLK_f: showing_fps.ready = true; break;
+                                        case SDLK_r: reset_atoms.ready = true; break;
                                 }
                         } else if (event.type == SDL_KEYDOWN) {
                                 switch (event.key.keysym.sym) {
@@ -395,6 +398,13 @@ int main(void) {
                                                         frames = 0; 
                                                 }
                                                 toggle_switch(&showing_fps);
+                                                break;
+                                        case SDLK_r:
+                                                if (reset_atoms.ready) {
+                                                        N_ATOMS = 0;
+                                                        atoms = malloc(sizeof(Atom) * 0);
+                                                }
+                                                toggle_switch(&reset_atoms);
                                                 break;
                                 }
                         } 
