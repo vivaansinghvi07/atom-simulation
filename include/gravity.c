@@ -20,7 +20,7 @@
 #define GRID_WIDTH_THRESHOLD 3
 
 // modifications for gravitational functions
-#define GRAVITATIONAL_CONSTANT 8
+#define GRAVITATIONAL_CONSTANT 2
 #define GRAVITATIONAL_DISTANCE_GUARD 20000
 #define GRAVITATIONAL_FUNCTION apply_gravity_barnes_hut
 

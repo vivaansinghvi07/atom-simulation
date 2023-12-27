@@ -13,8 +13,8 @@
 #define REPULSION_FUNC_A 0.000002
 #define REPULSION_FUNC_B 5
 
-// min distance between two centers to not be considered a collision
-#define COLLISION_ATOM_WIDTH 10
+// min distance between two centers to not be considered a collision, represents 2 * radius
+#define COLLISION_ATOM_WIDTH 8
 
 typedef struct {
         int mass;
@@ -50,7 +50,8 @@ void remove_faraway_atoms(Atom **atoms_pointer, int *n_atoms_pointer);
 void iterate_kinematics(Atom *atoms, int n_atoms);
 
 // applies collision detection between each atom
-void apply_collision_detection_naive(Atom *atoms, int n_atoms); // O(n^2) 
+// despite the O(n^2) time complexity, this shouldn't matter (up to a point) because operations are very simple
+void apply_collision_detection_naive(Atom *atoms, int n_atoms);
 
 // performs a collision between the two atoms, adjusting their velocity
 void apply_collision(Atom *atom, Atom *other, Point *distance);
