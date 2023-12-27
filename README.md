@@ -55,7 +55,6 @@ The simulation is controlled by many parameters (like a gravitational constant) 
 - `BARNES_HUT_THRESHOLD`: The threshold that controls how accurate a Barnes-Hut simulation is, representing θ (the quotient `width of rectangle / distance of center of mass`) in the Wikipedia page.
 
 </details>
-particles
 
 <details>
 <summary> In `include/atom.c` </summary>
