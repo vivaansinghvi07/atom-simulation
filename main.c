@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
 #include "include/point.c"
 #include "include/atom.c"
 #include "include/gravity.c"
@@ -17,7 +18,7 @@
 #define ATOM_DISPLAY_WIDTH 3
 
 // color mode of coloring the atoms
-#define DISPLAY_COLOR COLOR_VELOCITY
+#define DISPLAY_COLOR COLOR_NONE
 
 // controls how atoms are placed to the screen
 #define CLICK_PLACE_FUNC add_atoms_upon_click
@@ -37,6 +38,11 @@ typedef struct {
         uint8_t b;
 } RGB_Color;
 
+typedef struct {
+        bool ready;
+        bool on;
+} KeySwitch;
+
 enum ColorMode {
         COLOR_NONE, 
         COLOR_RANDOM, 
@@ -52,8 +58,9 @@ void clear_screen(SDL_Surface *surface);
 // display a given array of atoms
 void display_atoms(SDL_Surface *surface, Atom *atoms, enum ColorMode color_mode);
 
-// display the number of atoms to the screen
+// display the number of atoms to the screen and the fps to the screen 
 void display_atom_count(SDL_Surface *surface, int n_atoms);
+void display_fps(SDL_Surface *surface, int fps);
 
 // add atoms when the mouse is clicked
 void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_x, int mouse_y);
@@ -61,8 +68,14 @@ void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_
 // adds atoms to the screen but initializes them with some rotation
 void add_rotating_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_x, int mouse_y);
 
+// display a barnes hut tree around a group of atoms 
+void display_barnes_hut_tree(SDL_Surface *surface, QuadTreeNode *root, int depth);
+
 // step the simulation
 void step_simulation(Atom **atoms_pointer, int *n_atoms_pointer);
+
+// toggles a key switch, changing its state to true only if it is ready to change 
+void toggle_switch(KeySwitch *key_switch);
 
 // main loop
 int main(void);
@@ -157,10 +170,24 @@ int _char_to_disp_map(char c) {
         }
 }
 
+// x and y are at the top left corner of the 3x3 grid
 void _draw_block_at(SDL_Surface *surface, int x, int y) {
         for (int i = 0; i < TEXT_BLOCK_WIDTH; ++i) {
                 for (int j = 0; j < TEXT_BLOCK_WIDTH; ++j) {
                         set_pixel(surface, x+j, y+i, (RGB_Color) {255, 255, 255});
+                }
+        }
+}
+
+// x and y are at the top left corner of the 3x3 grid
+void _draw_digit(SDL_Surface *surface, char digit, int x, int y) {
+        int digit_map = _char_to_disp_map(digit);
+        for (int i = 0; i < 5; ++i) {
+                for (int j = 0; j < 3; ++j) {
+                        if (digit_map & 0b100000000000000) {
+                                _draw_block_at(surface, x + j * TEXT_BLOCK_WIDTH, y + i * TEXT_BLOCK_WIDTH);
+                        }
+                        digit_map <<= 1;
                 }
         }
 }
@@ -174,18 +201,22 @@ void display_atom_count(SDL_Surface *surface, int n_atoms) {
 
         // draw each number to the screen 
         for (int i = 0; i < len; ++i) {
-                int digit_map = _char_to_disp_map(buf[i]);
-                for (int y = 0; y < 5; ++y) {
-                        for (int x = 0; x < 3; ++x) {
-                                if (digit_map & 0b100000000000000) {
-                                        _draw_block_at(surface, TEXT_OFFSET + (i * 4 + x) * TEXT_BLOCK_WIDTH, 
-                                                                TEXT_OFFSET + y * TEXT_BLOCK_WIDTH);
-                                }
-                                digit_map <<= 1;
-                        }
-                }
+                _draw_digit(surface, buf[i], TEXT_OFFSET + i * 4 * TEXT_BLOCK_WIDTH, TEXT_OFFSET);
         }
+}
 
+void display_fps(SDL_Surface *surface, int fps) {
+
+        // create a buffer storing the string
+        int len = snprintf(NULL, 0, "%d", fps);
+        char buf[len + 1];
+        sprintf(buf, "%d", fps);
+
+        // go through each number in reverse order to print from the back
+        for (int i = len - 1; i >= 0; --i) {
+                _draw_digit(surface, buf[i], SCREEN_X - TEXT_OFFSET - (len - i) * 4 * TEXT_BLOCK_WIDTH, TEXT_OFFSET);
+        }
+        
 }
 
 void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_x, int mouse_y) { 
@@ -252,7 +283,6 @@ void add_rotating_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, i
                 atom->velocity = (Point) {.x = velocity * -fast_sin_atan2(&distance),
                                           .y = velocity * fast_cos_atan2(&distance)};
         }
-
 }
 
 RGB_Color _get_node_color(int depth) {
@@ -312,19 +342,32 @@ void step_simulation(Atom **atoms_pointer, int *n_atoms_pointer) {
         }
 }
 
+void toggle_switch(KeySwitch *key_switch) {
+        if (key_switch->ready) {
+                key_switch->on = !key_switch->on;
+                key_switch->ready = false;
+        }
+}
+
 int main(void) {
+
+        // initialize things used throughout the program
         Atom *atoms = init_atoms(N_ATOMS, SCREEN_X, SCREEN_Y);
         SDL_Window *window = SDL_CreateWindow(
                 "Simulation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
                 SCREEN_X, SCREEN_Y, 0
         );
         SDL_Surface *surface = SDL_GetWindowSurface(window);
+
+        // initialize "helper variables" that control what is displayed
         SDL_Event event;
-        int mouse_x, mouse_y;
+        int mouse_x, mouse_y, frames = 0;
         bool quit = false, 
-             gravitation_to_mouse = false, 
-             showing_n_atoms = false,
-             showing_barnes_hut_tree = false;
+             gravitation_to_mouse = false;
+        KeySwitch showing_n_atoms = { .ready = true, .on = false },
+                  showing_barnes_hut_tree = { .ready = true, .on = false },
+                  showing_fps = { .ready = true, .on = false };
+        double fps_start = 0;
         while (!quit) {
 
                 SDL_GetMouseState(&mouse_x, &mouse_y);
@@ -338,13 +381,21 @@ int main(void) {
                                 gravitation_to_mouse = !gravitation_to_mouse; 
                         } else if (event.type == SDL_KEYUP) {
                                 switch (event.key.keysym.sym) {
-                                        case SDLK_n: showing_n_atoms = false; break;
-                                        case SDLK_d: showing_barnes_hut_tree = false; break;
+                                        case SDLK_n: showing_n_atoms.ready = true; break;
+                                        case SDLK_d: showing_barnes_hut_tree.ready = true; break;
+                                        case SDLK_f: showing_fps.ready = true; break;
                                 }
                         } else if (event.type == SDL_KEYDOWN) {
                                 switch (event.key.keysym.sym) {
-                                        case SDLK_n: showing_n_atoms = true; break;
-                                        case SDLK_d: showing_barnes_hut_tree = true; break;
+                                        case SDLK_n: toggle_switch(&showing_n_atoms); break;
+                                        case SDLK_d: toggle_switch(&showing_barnes_hut_tree); break;
+                                        case SDLK_f: 
+                                                if (showing_fps.ready) {
+                                                        fps_start = (double) clock(); 
+                                                        frames = 0; 
+                                                }
+                                                toggle_switch(&showing_fps);
+                                                break;
                                 }
                         } 
                 }
@@ -355,12 +406,15 @@ int main(void) {
                 }
                 iterate_kinematics(atoms, N_ATOMS);
                 clear_screen(surface);
-                if (showing_barnes_hut_tree) {
+                if (showing_barnes_hut_tree.on) {
                         display_barnes_hut_tree(surface, build_barnes_hut_tree(atoms, N_ATOMS), 0);
                 }
                 display_atoms(surface, atoms, DISPLAY_COLOR);
-                if (showing_n_atoms) {
+                if (showing_n_atoms.on) {
                         display_atom_count(surface, N_ATOMS);
+                }
+                if (showing_fps.on) {
+                        display_fps(surface, frames++ * CLOCKS_PER_SEC / ((double) clock() - fps_start));
                 }
                 SDL_UpdateWindowSurface(window);
         }
