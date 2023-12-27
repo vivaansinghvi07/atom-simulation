@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 # then, find the force of attraction of a particle to the center of mass of those particles
 # determine what is the highest distance from the center of mass given a certain "n"
 # where "n" is half of the side length of the square on the "approximation grid"
-# therefore, for grids of l = 100, the particle needs to be at least 376 squares away 
-# this seems to have a linear relationship 
+# therefore, for grids of l = 100 and T = 0.90, the particle needs to be at about 300 squares away 
+# this seems to have a linear relationship with a slope of 3 for T = 0.90
 
 T = 0.90  # accuracy threshold
 

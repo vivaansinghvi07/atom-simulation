@@ -29,7 +29,9 @@
 #define TEXT_BLOCK_WIDTH 10
 #define TEXT_OFFSET 20
 
-bool COLLISION_DETECTION_ON = false;
+// detecting collisions or not
+#define COLLISION_DETECTION_ON true
+
 int N_ATOMS = 0;
 int SIMULATION_STEPS = 0;
 
