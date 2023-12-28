@@ -2,6 +2,8 @@
 
 This is my first project in C, and simulates particles in a 2D space with many adjustible parameters and an interactive display. Note: throughout this file and the project, "particles" are referred to as "atoms".
 
+<video src="./recording.mov" width="320" height="240" controls></video>
+
 ## Features
 
 - Interactive display of atoms in the simulation 
