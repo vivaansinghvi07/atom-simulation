@@ -58,6 +58,15 @@ void apply_gravity_each_point_naive(Atom *atoms, int n_atoms);  // O(n^2)
 // helper funciton to determine gravity from one object to another
 Point get_gravity_of_a(int mass_a, Point *com_a, Point *com_b);
 
+// create a quad tree for the Barnes-Hut Algorithm 
+QuadTreeNode *build_barnes_hut_tree(Atom *atoms, int n_atoms);
+
+// determine the gravity using the barnes-hut algorithm 
+void apply_gravity_barnes_hut(Atom *atoms, int n_atoms);
+
+// free a quad tree 
+void free_quad_tree(QuadTreeNode *root);
+
 /*
  * FUNCTION IMPLEMENTATIONS BELOW
  * END OF PSEUDO HEADER FILE
@@ -386,6 +395,16 @@ QuadTreeNode *build_barnes_hut_tree(Atom *atoms, int n_atoms) {
         return root;
 }
 
+void free_quad_tree(QuadTreeNode *root) {
+        if (root->top_left) {
+                free_quad_tree(root->top_left);
+                free_quad_tree(root->bottom_left);
+                free_quad_tree(root->top_right);
+                free_quad_tree(root->bottom_right);
+        }
+        free(root);
+}
+
 void debug_barnes_hut_tree(QuadTreeNode *root, int depth, int max_depth) {
         if (depth >= max_depth) {
                 return;
@@ -418,7 +437,7 @@ double max(double a, double b) {
         return a > b ? a : b;
 }
 
-Point calculate_barnes_hut_gravity(Atom *atom, QuadTreeNode *root) {
+Point _calculate_barnes_hut_gravity(Atom *atom, QuadTreeNode *root) {
         if (!root->total_mass) {
                 return (Point) {0};
         } else if (!root->top_left || max(root->bounds.max_values.y - root->bounds.min_values.y,
@@ -427,10 +446,10 @@ Point calculate_barnes_hut_gravity(Atom *atom, QuadTreeNode *root) {
                                                           .y = atom->position.y - root->center_of_mass.y}) < BARNES_HUT_THRESHOLD) { 
                 return get_gravity_of_a(root->total_mass, &root->center_of_mass, &atom->position);
         } else {
-                Point top_left_sum = calculate_barnes_hut_gravity(atom, root->top_left),
-                      top_right_sum = calculate_barnes_hut_gravity(atom, root->top_right),
-                      bottom_left_sum = calculate_barnes_hut_gravity(atom, root->bottom_left),
-                      bottom_right_sum = calculate_barnes_hut_gravity(atom, root->bottom_right);
+                Point top_left_sum = _calculate_barnes_hut_gravity(atom, root->top_left),
+                      top_right_sum = _calculate_barnes_hut_gravity(atom, root->top_right),
+                      bottom_left_sum = _calculate_barnes_hut_gravity(atom, root->bottom_left),
+                      bottom_right_sum = _calculate_barnes_hut_gravity(atom, root->bottom_right);
                 return (Point) {.x = top_left_sum.x + top_right_sum.x + bottom_right_sum.x + bottom_left_sum.x,
                                 .y = top_left_sum.y + top_right_sum.y + bottom_right_sum.y + bottom_left_sum.y};
         }
@@ -441,10 +460,11 @@ void apply_gravity_barnes_hut(Atom *atoms, int n_atoms) {
         // debug_barnes_hut_tree(root, 0, 10);
         for (int i = 0; i < n_atoms; ++i) {
                 Atom *atom = atoms + i;
-                Point acceleration_gravity = calculate_barnes_hut_gravity(atom, root);
+                Point acceleration_gravity = _calculate_barnes_hut_gravity(atom, root);
                 atom->acceleration.x += acceleration_gravity.x;
                 atom->acceleration.y += acceleration_gravity.y;
         }
+        free_quad_tree(root);
 }
 
 #endif

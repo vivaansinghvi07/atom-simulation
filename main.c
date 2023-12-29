@@ -419,7 +419,9 @@ int main(void) {
                 iterate_kinematics(atoms, N_ATOMS);
                 clear_screen(surface);
                 if (showing_barnes_hut_tree.on) {
-                        display_barnes_hut_tree(surface, build_barnes_hut_tree(atoms, N_ATOMS), 0);
+                        QuadTreeNode *root = build_barnes_hut_tree(atoms, N_ATOMS);
+                        display_barnes_hut_tree(surface, root, 0);
+                        free_quad_tree(root);
                 }
                 display_atoms(surface, atoms, DISPLAY_COLOR);
                 if (showing_n_atoms.on) {
