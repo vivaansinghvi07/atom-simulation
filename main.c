@@ -30,7 +30,7 @@
 #define TEXT_OFFSET 20
 
 // detecting collisions or not
-#define COLLISION_DETECTION_ON true
+#define COLLISION_DETECTION_ON false
 
 int N_ATOMS = 0;
 int SIMULATION_STEPS = 0;
@@ -404,6 +404,7 @@ int main(void) {
                                         case SDLK_r:
                                                 if (reset_atoms.ready) {
                                                         N_ATOMS = 0;
+                                                        free(atoms);
                                                         atoms = malloc(sizeof(Atom) * 0);
                                                 }
                                                 toggle_switch(&reset_atoms);
