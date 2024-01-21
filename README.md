@@ -23,7 +23,7 @@ I also implemented a function that follows the (a/x\*\*n - b/x\*\*m) model for a
 
 ## Usage
 
-To use this project, simply compile the `main.c` file. Note: all source files are imported from directly, mainly because I was having linker issues when creating seperate header files. The project has one dependency, which is the SDL library.
+To use this project, simply compile the `main.c` file. The project depends on the SDL library, which was placed in the `sdl_include` and `sdl_lib` directories (not pushed onto the repo, but referenced in the `Makefile`).
 
 ### Configuration
 
