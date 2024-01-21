@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
-#include "include/point.c"
-#include "include/atom.c"
-#include "include/gravity.c"
+#include "include/point.h"
+#include "include/atom.h"
+#include "include/gravity.h"
 
 // dimensions for the SDL window
 #define SCREEN_X 1600
