@@ -14,16 +14,13 @@
 // effective mass of the mouse when right click is pressed
 #define MOUSE_MASS 2000
 
-// width of each atom being displayed to the screen
-#define ATOM_DISPLAY_WIDTH 3
-
 // color mode of coloring the atoms
-#define DISPLAY_COLOR COLOR_NONE
+#define DISPLAY_COLOR COLOR_RANDOM
 
 // controls how atoms are placed to the screen
 #define CLICK_PLACE_FUNC add_rotating_atoms_upon_click
 #define CLICK_PLACE_WIDTH 75
-#define CLICK_PLACE_GAP 5
+#define CLICK_PLACE_GAP 15
 
 // controls how atom count is displayed
 #define TEXT_BLOCK_WIDTH 10
@@ -32,7 +29,7 @@
 // detecting collisions or not
 #define COLLISION_DETECTION_ON false
 
-int N_ATOMS = 0;
+int N_ATOMS = 1000;
 int SIMULATION_STEPS = 0;
 
 typedef struct {
@@ -139,9 +136,12 @@ void display_atoms(SDL_Surface *surface, Atom *atoms, enum ColorMode color_mode)
                 }
 
                 // apply coloring to each pixel for the atom
-                for (int x = -(ATOM_DISPLAY_WIDTH / 2); x < ATOM_DISPLAY_WIDTH / 2 + 1; ++x) {
-                        for (int y = -(ATOM_DISPLAY_WIDTH / 2); y < ATOM_DISPLAY_WIDTH / 2 + 1; ++y) {
-                                set_pixel(surface, atom_x + x, atom_y + y, (RGB_Color){.r = r, .g = g, .b = b});
+                int radius = atoms[i].mass;
+                for (int x = -radius; x < radius + 1; ++x) {
+                        for (int y = -radius; y < radius + 1; ++y) {
+                                if (sqrt(x*x + y*y) < radius) {
+                                        set_pixel(surface, atom_x + x, atom_y + y, (RGB_Color){.r = r, .g = g, .b = b});
+                                }
                         }
                 }
         }
@@ -252,7 +252,7 @@ void add_atoms_upon_click(Atom **atoms_pointer, int *n_atoms_pointer, int mouse_
         PointNode *temp = head;
         while (temp != NULL) {
                 (*atoms_pointer)[current_atom] = (Atom) {
-                        .mass = 1,
+                        .mass = MIN_MASS + rand() % (MAX_MASS - MIN_MASS + 1),
                         .position = (Point) { .x = temp->data.x, .y = temp->data.y },
                         .velocity = (Point) {0},
                         .acceleration = (Point) {0}

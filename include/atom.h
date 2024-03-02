@@ -3,6 +3,10 @@
 #ifndef SIM_ATOM
 #define SIM_ATOM
 
+// bounds for random atom mass
+#define MIN_MASS 3
+#define MAX_MASS 6
+
 // min number of std devs to consider for removing atoms
 #define MIN_STD_DEV_FOR_REMOVAL 7
 

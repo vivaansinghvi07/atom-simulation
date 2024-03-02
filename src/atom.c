@@ -30,7 +30,7 @@ Atom *init_atoms(int n_atoms, int x_max, int y_max) {
         srand(100);
         Atom *atoms = malloc(sizeof(Atom) * n_atoms);
         for (int i = 0; i < n_atoms; ++i) {
-                atoms[i].mass = 1; 
+                atoms[i].mass = MIN_MASS + rand() % (MAX_MASS - MIN_MASS + 1);
                 atoms[i].position = (Point) {.x = rand() % (x_max / 2) + ((double) x_max / 4), 
                                              .y = rand() % (y_max / 2) + ((double) y_max / 4) };
         }
